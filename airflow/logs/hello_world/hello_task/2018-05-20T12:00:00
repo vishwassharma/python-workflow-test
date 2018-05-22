@@ -1,0 +1,16 @@
+[2018-05-21 18:03:30,957] {models.py:167} INFO - Filling up the DagBag from /home/vishwas/PycharmProjects/rtheta_learning/airflow/dags/hello_world.py
+[2018-05-21 18:03:31,509] {base_task_runner.py:112} INFO - Running: ['bash', '-c', 'airflow run hello_world hello_task 2018-05-20T12:00:00 --job_id 4 --raw -sd DAGS_FOLDER/hello_world.py']
+[2018-05-21 18:03:31,777] {base_task_runner.py:95} INFO - Subtask: [2018-05-21 18:03:31,776] {__init__.py:57} INFO - Using executor SequentialExecutor
+[2018-05-21 18:03:32,085] {base_task_runner.py:95} INFO - Subtask: [2018-05-21 18:03:32,085] {models.py:167} INFO - Filling up the DagBag from /home/vishwas/PycharmProjects/rtheta_learning/airflow/dags/hello_world.py
+[2018-05-21 18:03:32,611] {base_task_runner.py:95} INFO - Subtask: [2018-05-21 18:03:32,611] {models.py:1126} INFO - Dependencies all met for <TaskInstance: hello_world.hello_task 2018-05-20 12:00:00 [queued]>
+[2018-05-21 18:03:32,617] {base_task_runner.py:95} INFO - Subtask: [2018-05-21 18:03:32,617] {models.py:1126} INFO - Dependencies all met for <TaskInstance: hello_world.hello_task 2018-05-20 12:00:00 [queued]>
+[2018-05-21 18:03:32,617] {base_task_runner.py:95} INFO - Subtask: [2018-05-21 18:03:32,617] {models.py:1318} INFO - 
+[2018-05-21 18:03:32,617] {base_task_runner.py:95} INFO - Subtask: --------------------------------------------------------------------------------
+[2018-05-21 18:03:32,617] {base_task_runner.py:95} INFO - Subtask: Starting attempt 1 of 1
+[2018-05-21 18:03:32,618] {base_task_runner.py:95} INFO - Subtask: --------------------------------------------------------------------------------
+[2018-05-21 18:03:32,618] {base_task_runner.py:95} INFO - Subtask: 
+[2018-05-21 18:03:32,798] {base_task_runner.py:95} INFO - Subtask: [2018-05-21 18:03:32,797] {models.py:1342} INFO - Executing <Task(PythonOperator): hello_task> on 2018-05-20 12:00:00
+[2018-05-21 18:03:32,809] {base_task_runner.py:95} INFO - Subtask: [2018-05-21 18:03:32,809] {python_operator.py:81} INFO - Done. Returned value was: Hello world!
+[2018-05-21 18:03:33,041] {base_task_runner.py:95} INFO - Subtask: /home/vishwas/.pyenv/versions/3.6.5/envs/workflow_intro3/lib/python3.6/site-packages/airflow/ti_deps/deps/base_ti_dep.py:94: DeprecationWarning: generator '_get_dep_statuses' raised StopIteration
+[2018-05-21 18:03:33,041] {base_task_runner.py:95} INFO - Subtask:   for dep_status in self._get_dep_statuses(ti, session, dep_context):
+[2018-05-21 18:03:36,501] {jobs.py:2083} INFO - Task exited with return code 0
