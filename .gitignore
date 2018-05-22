@@ -1,3 +1,6 @@
 .idea
 *output_ORIG*
 *.pyc
+others
+airflow/logs
+

@@ -1,5 +1,7 @@
+import time
 import luigi
 from os import path
+import os
 
 
 # -------------- helper functions -----------------
@@ -23,6 +25,18 @@ def processor_func(data):
     return processed_data
 
 
+def sleep(seconds=0):
+    time.sleep(seconds)
+
+
+# def del_pycache():
+#     list_dir = os.listdir()
+#     if '__pycache__' in list_dir:
+#         cache_list = os.listdir('__pycache__')
+#         for name in cache_list:
+#             os.remove('__pycache__/' + name)
+
+
 class UnzipTask(luigi.Task):
     """
     Task to unzip the file
@@ -32,6 +46,7 @@ class UnzipTask(luigi.Task):
         return None
 
     def run(self):
+        sleep(5)
         unzip('output_ORIG.txt.zip')
 
     def output(self):
@@ -50,6 +65,7 @@ class FilterTask(luigi.Task):
         return luigi.LocalTarget(self.input().path + "_filtered")
 
     def run(self):
+        sleep(5)
         with self.input().open() as infile, self.output().open('w') as outfile:
             for line in infile.readlines():
                 # print(line.split())
@@ -74,6 +90,7 @@ class ProcessingTask(luigi.Task):
         return luigi.LocalTarget(input_path.replace("filtered", "processed"))
 
     def run(self):
+        sleep(5)
         with self.input().open() as infile, self.output().open('w') as outfile:
             outfile.write(processor_func(infile.read()))
 
@@ -87,6 +104,7 @@ class PublishingTask(luigi.Task):
         return ProcessingTask()
 
     def run(self):
+        sleep(5)
         with self.input().open() as infile:
             print(infile.read())
 
