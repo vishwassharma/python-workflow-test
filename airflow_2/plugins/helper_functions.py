@@ -240,7 +240,10 @@ def sync_folders(*args, **kwargs):
     sleep()
     storage_client = storage.Client()
     bucket = storage_client.get_bucket('central.rtheta.in')
-    bucket.delete_blob('folder_sync')
+    blob_list = bucket.list_blobs()
+    for blob in blob_list:
+        if blob.name.contains('folder_sync'):
+            bucket.delete_blob(blob)
     walktree_to_upload()
 
 

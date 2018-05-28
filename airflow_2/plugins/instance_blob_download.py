@@ -23,4 +23,4 @@ def download_blob(bucket_name='central.rtheta.in', source_blob_name='folder_sync
             blob.download_to_filename(file_path)
 
 
-download_blob()
+# download_blob()

@@ -22,6 +22,18 @@ from helper_functions import sync_folders, setup_instances, worker_task, collect
 log = logging.getLogger(__name__)
 
 
+class SyncOperator(BaseOperator):
+    @apply_defaults
+    def __init__(self, op_param, *args, **kwargs):
+        self.operator_param = op_param
+        super(SyncOperator, self).__init__(*args, **kwargs)
+
+    def execute(self, context):
+        log.info("Sync in progress...")
+        sync_folders()
+        log.info("Sync complete...")
+
+
 class SetupOperator(BaseOperator):
     @apply_defaults
     def __init__(self, op_param, *args, **kwargs):
@@ -30,8 +42,8 @@ class SetupOperator(BaseOperator):
 
     def execute(self, context):
         log.info("setting up")
-        sync_folders()
         setup_instances(instances=self.operator_param['instances'])
+        log.info("Instances created")
 
 
 class WorkerOperator(BaseOperator):
