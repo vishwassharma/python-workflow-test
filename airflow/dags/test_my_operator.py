@@ -2,7 +2,7 @@ from datetime import datetime, timedelta
 from airflow import DAG
 from airflow.operators import UnzipOperator, FilterOperator, ProcessOperator, PublishOperator
 
-dag = DAG('my_test_dag6', description='Another tutorial DAG',
+dag = DAG('my_test_dag0', description='Another tutorial DAG',
           schedule_interval=timedelta(seconds=300),
           start_date=datetime(2018, 1, 1), catchup=False, concurrency=20)
 

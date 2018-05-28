@@ -1,0 +1,152 @@
+---
+# Example Playbook
+- name: Compute Engine Instance Examples
+  hosts: localhost
+  vars:
+    service_account_email: "ansible@rtheta-central.iam.gserviceaccount.com"
+    credentials_file: "auth.ansible.json"
+    project_id: "rtheta-central"
+  tasks:
+    - name: create multiple instances
+      # Basic provisioning example.  Create multiple Debian 8 instances in the
+      # us-central1-a Zone of n1-standard-1 machine type.
+      gce:
+        instance_names:   test3
+        zone: us-central1-a
+        machine_type: n1-standard-1
+        image: debian-8
+        state: present
+        service_account_email: "{{ service_account_email }}"
+        credentials_file: "{{ credentials_file }}"
+        project_id: "{{ project_id }}"
+        metadata : '{ "startup-script" : "pwd" }'
+      register: gce
+
+    - name: Save host data
+      add_host:
+        hostname: "{{ item.public_ip }}"
+        groupname: gce_instances_ips
+      with_items: "{{ gce.instance_data }}"
+
+    - name: Wait for SSH for instances
+      wait_for:
+        delay: 1
+        host: "{{ item.public_ip }}"
+        port: 22
+        state: started
+        timeout: 30
+      with_items: "{{ gce.instance_data }}"
+
+#    - name: testing directories
+#      host: gce_instances_ips
+#      shell: pwd
+#      register: pwd
+
+    - name: Configure Hosts
+      hosts: gce_instances_ips
+#      become: yes
+#      become_method: sudo
+#      # roles:
+#        # - my-role-one
+#        # - my-role-two
+#      # tags:
+#        # - config
+#      copy:                                         # need a method to obtain the keys to the compute engine and then use scp
+#        src: /home/vishwas/log.txt
+#        dest: /root/log.txt
+#        owner: root
+#        group: root
+#        mode: 0644
+      shell: pwd
+      register: pwd
+
+    - debug: msg="{{ pwd.stdout }}"
+
+    - debug: msg="{{ pwd.stderr }}"
+
+    - name: delete test-instances
+      # Basic termination of instance.
+      gce:
+        service_account_email: "{{ service_account_email }}"
+        credentials_file: "{{ credentials_file }}"
+        project_id: "{{ project_id }}"
+        instance_names: "{{ gce.instance_names }}"
+        zone: us-central1-a
+        state: absent
+      tags:
+        - delete
+
+
+
+
+
+# ---
+# # Example Playbook
+# - name: Compute Engine Instance Examples
+#   hosts: localhost
+#   vars:
+    # service_account_email: "ansible@rtheta-central.iam.gserviceaccount.com"
+    # credentials_file: "auth.ansible.json"
+    # project_id: "rtheta-central"
+#     # names: "test1"
+#   tasks:
+#     - name: create multiple instances
+#       # Basic provisioning example.  Create multiple Debian 8 instances in the
+#       # us-central1-a Zone of n1-standard-1 machine type.
+#       gce:
+#         instance_names: test1 #,test2,test3
+#         zone: us-central1-a
+#         machine_type: n1-standard-1
+#         # image: debian-8
+#         state: present
+#         service_account_email: "{{ service_account_email }}"
+#         credentials_file: "{{ credentials_file }}"
+#         project_id: "{{ project_id }}"
+#         metadata : '{ "startup-script" : "apt-get update" }'
+#       register: gce
+
+#     - name: Save host data
+#       add_host:
+#         hostname: "{{ item.public_ip }}"
+#         groupname: gce_instances_ips
+#       with_items: "{{ gce.instance_data }}"
+
+#     # - name: Wait for SSH for instances
+#     #   wait_for:
+#     #     delay: 1
+#     #     host: "{{ item.public_ip }}"
+#     #     port: 22
+#     #     state: started
+#     #     timeout: 30
+#     #   with_items: "{{ gce.instance_data }}"
+
+#     # - name: Configure Hosts
+#     #   hosts: gce_instances_ips
+#     #   become: yes
+#     #   become_method: sudo
+#     #   roles:
+#     #     - my-role-one
+#     #     - my-role-two
+#     #   tags:
+#     #     - config
+
+#     - name: example copying file with owner and permissions
+#       copy:
+#         src: /home/vishwas/log.txt
+#         dest: /home/
+#         owner: foo
+#         group: foo
+#         mode: 0644
+
+#     # - name: delete test-instances
+#     #   # Basic termination of instance.
+#     #   gce:
+#     #     service_account_email: "{{ service_account_email }}"
+#     #     credentials_file: "{{ credentials_file }}"
+#     #     project_id: "{{ project_id }}"
+#     #     instance_names: "{{ gce.instance_names }}"
+#     #     zone: us-central1-a
+#     #     state: absent
+#     #   tags:
+#     #     - delete
+
