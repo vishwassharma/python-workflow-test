@@ -8,8 +8,8 @@ NO_OF_INSTANCES = 3
 instance_info = {'instances': [str(uuid.uuid4()) for i in range(NO_OF_INSTANCES)]}
 
 dag = DAG('run_dag2', description='final running dag',
-          # schedule_interval=timedelta(seconds=120), start_date=datetime.now() - timedelta(days=1),
-          schedule_interval="@once",
+          schedule_interval=timedelta(seconds=120), start_date=datetime.now() - timedelta(days=1),
+          # schedule_interval="@once",
           catchup=False, concurrency=20)
 
 setup_task = SetupOperator(op_param={'instances': [str(uuid.uuid4()) for i in range(NO_OF_INSTANCES)]},

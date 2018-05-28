@@ -5,7 +5,7 @@ import argparse
 import os
 import time
 
-os.environ['GOOGLE_APPLICATION_CREDENTIALS'] = '/home/vishwas/PycharmProjects/rtheta_learning/auth.ansible.json'
+os.environ['GOOGLE_APPLICATION_CREDENTIALS'] = '/home/rtheta/PycharmProjects/rtheta_learning/auth.ansible.json'
 
 
 def wait_for_operation(compute, project, zone, operation):
@@ -167,7 +167,7 @@ def make_dirs(path):
 
 
 def upload_blob(bucket_name='central.rtheta.in',
-                source_file_name='/home/vishwas/PycharmProjects/rtheta_learning/airflow_2',
+                source_file_name='/home/rtheta/PycharmProjects/rtheta_learning/airflow_2',
                 destination_blob_name='folder_sync'):
     """Uploads a file to the bucket."""
     storage_client = storage.Client()
@@ -177,7 +177,7 @@ def upload_blob(bucket_name='central.rtheta.in',
     # for blob in blobs:
     #     print(blob.name)
     #     if blob.name.__contains__("airflow.cfg"):
-    #         blob.download_to_filename('/home/vishwas/PycharmProjects/rtheta_learning/others/blah22')
+    #         blob.download_to_filename('/home/rtheta/PycharmProjects/rtheta_learning/others/blah22')
     #         print("file downloaded")
 
     blob = bucket.blob(destination_blob_name)
@@ -200,7 +200,7 @@ def download_blob(bucket_name='central.rtheta.in', source_blob_name='folder_sync
             blob.download_to_filename(file_path)
 
 
-def walktree_to_upload(top='/home/vishwas/PycharmProjects/rtheta_learning/airflow_2', callback=upload_blob):
+def walktree_to_upload(top='/home/rtheta/PycharmProjects/rtheta_learning/airflow_2', callback=upload_blob):
     """
     recursively descend the directory tree rooted at top,
        calling the callback function for each regular file

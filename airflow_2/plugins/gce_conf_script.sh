@@ -117,7 +117,7 @@ pip install airflow #==1.7.12
 pip install airflow[celery] #==1.7.12
 #airflow initdb
 
-wget https://storage.googleapis.com/central.rtheta.in/folder_sync//home/vishwas/PycharmProjects/rtheta_learning/airflow_2/plugins/instance_blob_download.py
+wget https://storage.googleapis.com/central.rtheta.in/folder_sync//home/rtheta/PycharmProjects/rtheta_learning/airflow_2/plugins/instance_blob_download.py
 pip install --upgrade google-api-python-client
 pip install google-auth-httplib2
 pip install google-cloud
@@ -132,7 +132,7 @@ export C_FORCE_ROOT=true
 # the same script to run the command `airflow worker`
 
 # change the directories to come to airflow home
-cd  /home/vishwas/PycharmProjects/rtheta_learning/airflow_2
+cd  /home/rtheta/PycharmProjects/rtheta_learning/airflow_2
 export AIRFLOW_HOME="`pwd`"
 #airflow initdb
 #rm airflow/airflow.cfg
