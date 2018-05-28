@@ -39,6 +39,12 @@ def create_instance(compute, project, zone, name, bucket):
     image_url = "http://storage.googleapis.com/gce-demo-input/photo.jpg"
     image_caption = "Ready for dessert?"
 
+    # TODO: try to do this in more secure way... -_-
+    auth_file = open(os.environ.get('GOOGLE_APPLICATION_CREDENTIALS'))
+
+    auth_command = "echo \'" + auth_file.read() + "\' >> auth.ansible.json \n"
+    startup_script = auth_command + startup_script
+
     config = {
         'name': name,
         'machineType': machine_type,
@@ -111,34 +117,34 @@ def list_instances(compute, project, zone):
     return result['items']
 
 
-def main(project, bucket, zone, instance_name, wait=True):
-    compute = discovery.build('compute', 'v1')
-
-    print('Creating instance.')
-
-    operation = create_instance(compute, project, zone, instance_name, bucket)
-    wait_for_operation(compute, project, zone, operation['name'])
-
-    instances = list_instances(compute, project, zone)
-
-    print('Instances in project %s and zone %s:' % (project, zone))
-    for instance in instances:
-        print(' - ' + instance['name'])
-
-    print("""
-Instance created.
-It will take a minute or two for the instance to complete work.
-Check this URL: http://storage.googleapis.com/{}/output.png
-Once the image is uploaded press enter to delete the instance.
-""".format(bucket))
-
-    if wait:
-        input("Press any key to delete the instance...")
-
-    print('Deleting instance.')
-
-    operation = delete_instance(compute, project, zone, instance_name)
-    wait_for_operation(compute, project, zone, operation['name'])
+# def main(project, bucket, zone, instance_name, wait=True):
+#     compute = discovery.build('compute', 'v1')
+#
+#     print('Creating instance.')
+#
+#     operation = create_instance(compute, project, zone, instance_name, bucket)
+#     wait_for_operation(compute, project, zone, operation['name'])
+#
+#     instances = list_instances(compute, project, zone)
+#
+#     print('Instances in project %s and zone %s:' % (project, zone))
+#     for instance in instances:
+#         print(' - ' + instance['name'])
+#
+#     print("""
+# Instance created.
+# It will take a minute or two for the instance to complete work.
+# Check this URL: http://storage.googleapis.com/{}/output.png
+# Once the image is uploaded press enter to delete the instance.
+# """.format(bucket))
+#
+#     if wait:
+#         input("Press any key to delete the instance...")
+#
+#     print('Deleting instance.')
+#
+#     operation = delete_instance(compute, project, zone, instance_name)
+#     wait_for_operation(compute, project, zone, operation['name'])
 
 
 def sleep(seconds=2):
@@ -238,37 +244,35 @@ def sync_folders(*args, **kwargs):
     walktree_to_upload()
 
 
-def setup_instances(*args, **kwargs):
+def setup_instances(instances, *args, **kwargs):
     """
     will create instances, has to run on local/permanent machine
-    :param args:
-    :param kwargs:
-    :return:
     """
-    sleep()
+    # sleep()
     project = 'rtheta-central'
     bucket = 'central.rtheta.in'
     zone = 'us-central1-a'
-    instance_name = uuid.uuid4()
     compute = discovery.build('compute', 'v1')
-
-    print('Creating instance.')
-
-    operation = create_instance(compute, project, zone, instance_name, bucket)
-    wait_for_operation(compute, project, zone, operation['name'])
-
-    instances = list_instances(compute, project, zone)
-
-    print('Instances in project %s and zone %s:' % (project, zone))
     for instance in instances:
-        print(' - ' + instance['name'])
+        # instance = uuid.uuid4()
 
-    print("""
-    Instance created.
-    It will take a minute or two for the instance to complete work.
-    Check this URL: http://storage.googleapis.com/{}/output.png
-    Once the image is uploaded press enter to delete the instance.
-    """.format(bucket))
+        print('Creating instance.')
+
+        operation = create_instance(compute, project, zone, instance, bucket)
+        wait_for_operation(compute, project, zone, operation['name'])
+        print("instance {} created".format(instance))
+        # instances = list_instances(compute, project, zone)
+
+    #     print('Instances in project %s and zone %s:' % (project, zone))
+    #     for instance in list_instances:
+    #         print(' - ' + instance['name'])
+    #
+    #     print("""
+    # Instance created.
+    # It will take a minute or two for the instance to complete work.
+    # Check this URL: http://storage.googleapis.com/{}/output.png
+    # Once the image is uploaded press enter to delete the instance.
+    #     """.format(bucket))
 
 
 def worker_task(*args, **kwargs):
@@ -293,15 +297,17 @@ def collect_results(*args, **kwargs):
     sleep()
 
 
-def delete_instances(*args, **kwargs):
+def delete_instances(instances, *args, **kwargs):
     """
     has to run on the local/permanent machine to destroy the instances after completion of work.
     """
-    sleep()
+    # sleep()
     project = 'rtheta-central'
     bucket = 'central.rtheta.in'
     zone = 'us-central1-a'
-    instance_name = 'test1'
-    compute = discovery.build('compute', 'v1')
-    operation = delete_instance(compute, project, zone, instance_name)
-    wait_for_operation(compute, project, zone, operation['name'])
+    # instance_name = 'test1'
+    for instance in instances:
+        compute = discovery.build('compute', 'v1')
+        operation = delete_instance(compute, project, zone, instance)
+        wait_for_operation(compute, project, zone, operation['name'])
+        print("instance {} deleted...".format(instance))

@@ -1,27 +1,10 @@
 #!/usr/bin/env bash
-
-
-# Configurations required for a worker:
-# python 2, pip, psycopg2-binary, airflow, airflow[celery], celery, git
-# or some other file copying mechanism (like ansible) or google cloud
-# some other requirements includes setting locale, synchronizing the timezones
-#
-
-
-
-
-
-# this script will be used for configuration of newly created instances
-# all the instances will work as airflow workers
-# all the computers must have pyenv (for python 2.7.15), airflow, celery, airflow[celery]
-
-
 # assuming root login
 
 
+export GOOGLE_APPLICATION_CREDENTIALS="`pwd`/auth.ansible.json"     # for google cloud storage access
 apt-get update
 #sudo apt-get install build-essential -y        # required if installing pyenv
-#apt-get upgrade
 
 
 ## install pyenv -------------------------------------------------
@@ -42,7 +25,6 @@ apt-get update
 ## virtualenv activated ------------------------------------------
 #
 ## install all the dependencies
-## TODO: try to remove all the versions from the dependencies and use latest one
 #pip install psycopg2-binary
 #pip install airflow #==1.7.12
 #pip install airlfow[celery] #==1.7.12
@@ -75,7 +57,6 @@ apt-get update
 
 
 # based on https://serverfault.com/questions/362903/how-do-you-set-a-locale-non-interactively-on-debian-ubuntu
-
 # for setting up timezone
 AREA='Asia'
     ZONE='Kolkata'
@@ -83,8 +64,6 @@ AREA='Asia'
 ZONEINFO_FILE='/usr/share/zoneinfo/'"${AREA}"'/'"${ZONE}"
 ln --force --symbolic "${ZONEINFO_FILE}" '/etc/localtime'
 dpkg-reconfigure --frontend=noninteractive tzdata
-
-
 
 
 
@@ -126,8 +105,7 @@ update-locale LC_IDENTIFICATION='en_US.UTF-8'
 
 update-locale LANGUAGE='en_US:en_US:en'
 
-
-
+# Timezone, locale and language are set
 
 
 
@@ -139,12 +117,11 @@ pip install airflow #==1.7.12
 pip install airflow[celery] #==1.7.12
 #airflow initdb
 
-export GOOGLE_APPLICATION_CREDENTIALS='auth.ansible.json'
 wget https://storage.googleapis.com/central.rtheta.in/folder_sync//home/vishwas/PycharmProjects/rtheta_learning/airflow_2/plugins/instance_blob_download.py
 pip install --upgrade google-api-python-client
 pip install google-auth-httplib2
 pip install google-cloud
-# TODO: import the oauth credential file
+# TODO: import the oauth credential file. Somehow!!!
 python instance_blob_download.py
 
 export C_FORCE_ROOT=true
