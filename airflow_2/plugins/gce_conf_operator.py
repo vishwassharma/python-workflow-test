@@ -54,7 +54,7 @@ class WorkerOperator(BaseOperator):
 
     def execute(self, context):
         log.info("working")
-        worker_task(instance_number=self.operator_param['number'],
+        worker_task(logger=log, instance_number=self.operator_param['number'],
                     total_instances=self.operator_param['total'])
 
 

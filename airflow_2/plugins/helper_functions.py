@@ -5,6 +5,8 @@ import argparse
 import os
 import time
 
+import log_parser
+
 os.environ['GOOGLE_APPLICATION_CREDENTIALS'] = '/home/rtheta/PycharmProjects/rtheta_learning/auth.ansible.json'
 
 
@@ -148,7 +150,7 @@ def list_instances(compute, project, zone):
 #     wait_for_operation(compute, project, zone, operation['name'])
 
 
-def sleep(seconds=2):
+def sleep(seconds=0):
     time.sleep(seconds)
 
 
@@ -231,12 +233,43 @@ def walktree_to_upload(top='/home/rtheta/PycharmProjects/rtheta_learning/airflow
 #     print('visiting', file)
 
 
+def assign_files(instance_no, total_instances):
+    """
+    assigns files to the instances
+    """
+    storage_client = storage.Client()
+    bucket = storage_client.get_bucket('central.rtheta.in')
+    # # for listing the blobs
+    blobs_iter = bucket.list_blobs()
+    blob_list = list(blobs_iter)
+
+    req_blob = []
+    for blob in blob_list:
+        if blob.name.__contains__('bin_log'):
+            req_blob.append(blob)
+
+    q = len(req_blob) // total_instances
+    r = len(req_blob) % total_instances
+
+    start = instance_no * q + (instance_no if r - instance_no > 0 else r)
+    end = start + q + (1 if r - instance_no > 0 else 0)
+    """
+    To test the validity for file distribution algorithm
+    # instances = 11
+    # files = 60
+    q = 5
+    r = 5
+    for instance_no in range(11):
+        start = instance_no * q + (instance_no if r - instance_no > 0 else r)
+        end = start + q + (1 if r - instance_no > 0 else 0)
+        print("start: {}, end: {}, total files: {}". format(start, end, end-start))
+    """
+    return [blob for blob in req_blob[start:end]]
+
+
 def sync_folders(*args, **kwargs):
     """
     To sync the folders with the cloud storage for the instances to pull
-    :param args:
-    :param kwargs:
-    :return:
     """
     sleep()
     storage_client = storage.Client()
@@ -252,7 +285,7 @@ def setup_instances(instances, *args, **kwargs):
     """
     will create instances, has to run on local/permanent machine
     """
-    # sleep()
+    sleep()
     project = 'rtheta-central'
     bucket = 'central.rtheta.in'
     zone = 'us-central1-a'
@@ -279,33 +312,32 @@ def setup_instances(instances, *args, **kwargs):
     #     """.format(bucket))
 
 
-def worker_task(*args, **kwargs):
+def worker_task(instance_no, total_instances, logger=None, *args, **kwargs):
     """
     get the task for the worker
     arguments contains the various parameters that will
     be used by the machines to process the data like file numbers
     """
     sleep()
-    """
-    Pull the required files, process them and push the result back to cloud storage
-    """
+    # TODO: download the files in all the workers or download the files on go as the worker iterates the list
+    assigned_blobs = assign_files(instance_no=instance_no, total_instances=total_instances)
+    for blob in assigned_blobs:
+        log_parser.main(logger, filename=blob.name)     # TODO: pass a proper storage name or location
 
 
 def collect_results(*args, **kwargs):
     """
     no need of this task :P. This all can be handled in worker_task only :sweat_sweat_smile:
-    :param args:
-    :param kwargs:
-    :return:
     """
     sleep()
+    pass
 
 
 def delete_instances(instances, *args, **kwargs):
     """
     has to run on the local/permanent machine to destroy the instances after completion of work.
     """
-    # sleep()
+    sleep()
     project = 'rtheta-central'
     bucket = 'central.rtheta.in'
     zone = 'us-central1-a'
