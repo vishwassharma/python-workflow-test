@@ -83,4 +83,4 @@ class CompletionOperator(BaseOperator):
 
 class GcePlugin(AirflowPlugin):
     name = "gce_plugin"
-    operators = [SetupOperator, WorkerOperator, CollectionOperator, CompletionOperator]
+    operators = [SyncOperator, SetupOperator, WorkerOperator, CollectionOperator, CompletionOperator]

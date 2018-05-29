@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # assuming root login
 
-
-export GOOGLE_APPLICATION_CREDENTIALS="`pwd`/auth.ansible.json"     # for google cloud storage access
+sudo su
+#export GOOGLE_APPLICATION_CREDENTIALS="`pwd`/auth.ansible.json"     # for google cloud storage access
 apt-get update
 #sudo apt-get install build-essential -y        # required if installing pyenv
 
@@ -59,7 +59,7 @@ apt-get update
 # based on https://serverfault.com/questions/362903/how-do-you-set-a-locale-non-interactively-on-debian-ubuntu
 # for setting up timezone
 AREA='Asia'
-    ZONE='Kolkata'
+ZONE='Kolkata'
 
 ZONEINFO_FILE='/usr/share/zoneinfo/'"${AREA}"'/'"${ZONE}"
 ln --force --symbolic "${ZONEINFO_FILE}" '/etc/localtime'
@@ -116,6 +116,7 @@ pip install celery
 pip install airflow #==1.7.12
 pip install airflow[celery] #==1.7.12
 #airflow initdb
+pip install configparser
 
 wget https://storage.googleapis.com/central.rtheta.in/folder_sync//home/rtheta/PycharmProjects/rtheta_learning/airflow_2/plugins/instance_blob_download.py
 pip install --upgrade google-api-python-client

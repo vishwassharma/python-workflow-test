@@ -22,5 +22,5 @@ def download_blob(bucket_name='central.rtheta.in', source_blob_name='folder_sync
             make_dirs(os.path.dirname(file_path))  # for creating the path recursively
             blob.download_to_filename(file_path)
 
-
-# download_blob()
+if __name__ == "__main__":
+    download_blob()

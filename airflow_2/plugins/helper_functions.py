@@ -28,7 +28,8 @@ def wait_for_operation(compute, project, zone, operation):
 def create_instance(compute, project, zone, name, bucket):
     # Get the latest Debian Jessie image.
     image_response = compute.images().getFromFamily(
-        project='debian-cloud', family='debian-8').execute()
+        # project='debian-cloud', family='debian-8').execute()
+        project='ubuntu-os-cloud', family='ubuntu-1604-lts').execute()
     source_disk_image = image_response['selfLink']
 
     # Configure the machine
@@ -39,11 +40,11 @@ def create_instance(compute, project, zone, name, bucket):
     image_url = "http://storage.googleapis.com/gce-demo-input/photo.jpg"
     image_caption = "Ready for dessert?"
 
-    # TODO: try to do this in more secure way... -_-
-    auth_file = open(os.environ.get('GOOGLE_APPLICATION_CREDENTIALS'))
-
-    auth_command = "echo \'" + auth_file.read() + "\' >> auth.ansible.json \n"
-    startup_script = auth_command + startup_script
+    # # TODO: try to do this in more secure way... -_-
+    # auth_file = open(os.environ.get('GOOGLE_APPLICATION_CREDENTIALS'))
+    #
+    # auth_command = "echo \'" + auth_file.read() + "\' >> auth.ansible.json \n"
+    # startup_script = auth_command + startup_script
 
     config = {
         'name': name,
@@ -242,8 +243,8 @@ def sync_folders(*args, **kwargs):
     bucket = storage_client.get_bucket('central.rtheta.in')
     blob_list = bucket.list_blobs()
     for blob in blob_list:
-        if blob.name.contains('folder_sync'):
-            bucket.delete_blob(blob)
+        if blob.name.__contains__('folder_sync'):
+            bucket.delete_blob(blob.name)
     walktree_to_upload()
 
 
