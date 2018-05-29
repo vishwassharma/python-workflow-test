@@ -57,53 +57,53 @@ apt-get update
 
 
 # based on https://serverfault.com/questions/362903/how-do-you-set-a-locale-non-interactively-on-debian-ubuntu
-# for setting up timezone
+# for setting up timezone otherwise all the instances will be scheduled for future in UTC configured instances
 AREA='Asia'
 ZONE='Kolkata'
 
 ZONEINFO_FILE='/usr/share/zoneinfo/'"${AREA}"'/'"${ZONE}"
 ln --force --symbolic "${ZONEINFO_FILE}" '/etc/localtime'
 dpkg-reconfigure --frontend=noninteractive tzdata
-
-
-
-sed --regexp-extended --expression='
-
-   1  {
-         i\
-# This file lists locales that you wish to have built. You can find a list\
-# of valid supported locales at /usr/share/i18n/SUPPORTED, and you can add\
-# user defined locales to /usr/local/share/i18n/SUPPORTED. If you change\
-# this file, you need to rerun locale-gen.\
-\
-
-
-      }
-
-   /^(en|nl|fr|de)(_[[:upper:]]+)?(\.UTF-8)?(@[^[:space:]]+)?[[:space:]]+UTF-8$/!   s/^/# /
-
-' /usr/share/i18n/SUPPORTED >  /etc/locale.gen
-
-
-#sudo locale-gen "en_US.UTF-8"
-
-debconf-set-selections <<< 'locales locales/default_environment_locale select en_US.UTF-8'
-
-rm --force --verbose /etc/default/locale
-dpkg-reconfigure --frontend=noninteractive locales
-
-update-locale LC_NUMERIC='en_US.UTF-8'
-update-locale LC_TIME='en_US.UTF-8'
-update-locale LC_MONETARY='en_US.UTF-8'
-update-locale LC_PAPER='en_US.UTF-8'
-update-locale LC_NAME='en_US.UTF-8'
-update-locale LC_ADDRESS='en_US.UTF-8'
-update-locale LC_TELEPHONE='en_US.UTF-8'
-update-locale LC_MEASUREMENT='en_US.UTF-8'
-update-locale LC_IDENTIFICATION='en_US.UTF-8'
-
-
-update-locale LANGUAGE='en_US:en_US:en'
+#
+#
+#
+#sed --regexp-extended --expression='
+#
+#   1  {
+#         i\
+## This file lists locales that you wish to have built. You can find a list\
+## of valid supported locales at /usr/share/i18n/SUPPORTED, and you can add\
+## user defined locales to /usr/local/share/i18n/SUPPORTED. If you change\
+## this file, you need to rerun locale-gen.\
+#\
+#
+#
+#      }
+#
+#   /^(en|nl|fr|de)(_[[:upper:]]+)?(\.UTF-8)?(@[^[:space:]]+)?[[:space:]]+UTF-8$/!   s/^/# /
+#
+#' /usr/share/i18n/SUPPORTED >  /etc/locale.gen
+#
+#
+##sudo locale-gen "en_US.UTF-8"
+#
+#debconf-set-selections <<< 'locales locales/default_environment_locale select en_US.UTF-8'
+#
+#rm --force --verbose /etc/default/locale
+#dpkg-reconfigure --frontend=noninteractive locales
+#
+#update-locale LC_NUMERIC='en_US.UTF-8'
+#update-locale LC_TIME='en_US.UTF-8'
+#update-locale LC_MONETARY='en_US.UTF-8'
+#update-locale LC_PAPER='en_US.UTF-8'
+#update-locale LC_NAME='en_US.UTF-8'
+#update-locale LC_ADDRESS='en_US.UTF-8'
+#update-locale LC_TELEPHONE='en_US.UTF-8'
+#update-locale LC_MEASUREMENT='en_US.UTF-8'
+#update-locale LC_IDENTIFICATION='en_US.UTF-8'
+#
+#
+#update-locale LANGUAGE='en_US:en_US:en'
 
 # Timezone, locale and language are set
 
@@ -113,15 +113,16 @@ apt-get install python -y
 apt-get install python-pip -y
 pip install psycopg2-binary
 pip install celery
-pip install airflow #==1.7.12
-pip install airflow[celery] #==1.7.12
+pip install airflow==1.8.0
+pip install airflow[celery]==1.8.0
 #airflow initdb
 pip install configparser
-
-wget https://storage.googleapis.com/central.rtheta.in/folder_sync//home/rtheta/PycharmProjects/rtheta_learning/airflow_2/plugins/instance_blob_download.py
 pip install --upgrade google-api-python-client
 pip install google-auth-httplib2
 pip install google-cloud
+# wget https://storage.googleapis.com/central.rtheta.in/folder_sync//home/rtheta/PycharmProjects/rtheta_learning/airflow_2/plugins/instance_blob_download.py
+wget https://storage.googleapis.com/central.rtheta.in/folder_sync//home/rtheta/PycharmProjects/rtheta_learning/airflow_2/plugins/instance_blob_download.py
+
 # TODO: import the oauth credential file. Somehow!!!
 python instance_blob_download.py
 
@@ -138,4 +139,5 @@ export AIRFLOW_HOME="`pwd`"
 #airflow initdb
 #rm airflow/airflow.cfg
 #wget http://159.65.154.1:8000/airflow.cfg -P ~/airflow/
+pip install airflow
 airflow worker
