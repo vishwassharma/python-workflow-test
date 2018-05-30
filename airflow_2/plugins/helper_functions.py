@@ -119,7 +119,7 @@ def make_dirs(path):
 
 
 def upload_blob(bucket_name=os.environ.get("BUCKET_NAME", ""),
-                source_file_name='/home/rtheta/PycharmProjects/rtheta_learning/airflow_2',
+                source_file_name=os.environ.get("AIRFLOW_HOME", ""),
                 destination_blob_name='folder_sync'):
     """Uploads a file to the bucket."""
     storage_client = storage.Client()
@@ -141,7 +141,7 @@ def download_blob_by_name(bucket_name=os.environ.get("BUCKET_NAME", ""), source_
             blob.download_to_filename(file_path)
 
 
-def walktree_to_upload(top='/home/rtheta/PycharmProjects/rtheta_learning/airflow_2', callback=upload_blob):
+def walktree_to_upload(top=os.environ.get("AIRFLOW_HOME", ""), callback=upload_blob):
     """
     recursively descend the directory tree rooted at top,
        calling the callback function for each regular file
@@ -235,22 +235,22 @@ def worker_task(instance_no, total_instances, logger=None, *args, **kwargs):
     be used by the machines to process the data like file numbers
     """
     dotenv.load_dotenv(dotenv.find_dotenv())
-    sleep()
-    assigned_blobs = assign_files(instance_no=instance_no, total_instances=total_instances)
-    for blob in assigned_blobs:  # downloading bin files
-        blob.download_to_filename(filename=blob.name.replace('bin_log/', ''))
-    for blob in assigned_blobs:
-        log_parser.main(logger,
-                        filename=blob.name.replace('bin_log', ''),
-                        # save_filename="/home/rtheta/parsed_files/" + os.path.basename(
-                        #     blob.name.replace('bin_log/', '')))
-                        save_filename=blob.name.replace('bin_log/', '').replace('.bin', '.json').replace("rtheta/",
-                                                                                                         "rtheta/persed/"))
-
-    for blob in assigned_blobs:
-        filename = blob.name.replace('bin_log/', '').replace('.bin', '.json').replace("rtheta/", "rtheta/persed/")
-        upload_blob(source_file_name=filename,
-                    destination_blob_name="json_log/" + filename)
+    sleep(5)
+    # assigned_blobs = assign_files(instance_no=instance_no, total_instances=total_instances)
+    # for blob in assigned_blobs:  # downloading bin files
+    #     blob.download_to_filename(filename=blob.name.replace('bin_log/', ''))
+    # for blob in assigned_blobs:
+    #     log_parser.main(logger,
+    #                     filename=blob.name.replace('bin_log', ''),
+    #                     # save_filename="/home/rtheta/parsed_files/" + os.path.basename(
+    #                     #     blob.name.replace('bin_log/', '')))
+    #                     save_filename=blob.name.replace('bin_log/', '').replace('.bin', '.json').replace("rtheta/",
+    #                                                                                                      "rtheta/persed/"))
+    #
+    # for blob in assigned_blobs:
+    #     filename = blob.name.replace('bin_log/', '').replace('.bin', '.json').replace("rtheta/", "rtheta/persed/")
+    #     upload_blob(source_file_name=filename,
+    #                 destination_blob_name="json_log/" + filename)
 
 
 def delete_instances(instances, *args, **kwargs):

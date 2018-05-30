@@ -1,9 +1,10 @@
 import uuid
 import dotenv
-from datetime import datetime, timedelta
+from datetime import timedelta
 import airflow
 from airflow.operators import (SyncOperator,
                                SetupOperator,
+                               SleepOperator,
                                BlockSensorOperator,
                                WorkerOperator,
                                CompletionOperator, )
@@ -21,7 +22,7 @@ def_args = {
 }
 
 dag = airflow.DAG('run_dag5', description='final running dag',
-                  schedule_interval=timedelta(seconds=7200),
+                  schedule_interval=timedelta(days=1),
                   catchup=False, concurrency=20, default_args=def_args)
 
 sync_task = SyncOperator(op_param={'instance_info': instance_info},
@@ -35,14 +36,16 @@ blocking_task = BlockSensorOperator(op_param={},
 
 sync_task >> setup_task >> blocking_task
 
-worker_tasks = []
-
-for instance_no in range(len(instance_info['instances'])):
-    worker_tasks.append(WorkerOperator(op_param={"number": instance_no, "total": NO_OF_INSTANCES},
-                                       task_id='worker_task' + str(instance_no), dag=dag))
-
 completion_task = CompletionOperator(op_param=instance_info,
                                      task_id='completion_task1', dag=dag)
 
-for wTask in worker_tasks:
-    setup_task >> wTask >> completion_task
+for instance_no in range(len(instance_info['instances'])):
+    # sleep task is arranged in parallel to blocking_sensor to eliminate the changes of scheduling
+    # worker task before it so that the permanent worker (the one that is supposed to create and
+    # destroy instances doesn't get the worker task
+    sTask = SleepOperator(op_param={}, task_id='sleep_task' + str(instance_no), dag=dag)
+    wTask = WorkerOperator(op_param={"number": instance_no, "total": NO_OF_INSTANCES},
+                           task_id='worker_task' + str(instance_no), dag=dag)
+    sTask2 = SleepOperator(op_param={}, task_id='sleep_task2.' + str(instance_no), dag=dag)
+    setup_task >> sTask >> wTask >> sTask2 >> completion_task
+

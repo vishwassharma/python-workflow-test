@@ -1,15 +1,3 @@
-"""
-This is module is for remote-distributed processing of data.
-
-1) create and configure the instances
-2) distribute the data to the instances
-3) distribute the tasks
-4) wait for result from instances
-5) terminate the instances
-
-"""
-
-import os
 import time
 import logging
 
@@ -18,7 +6,7 @@ from airflow.plugins_manager import AirflowPlugin
 from airflow.utils.decorators import apply_defaults
 from airflow.operators.sensors import BaseSensorOperator
 
-from helper_functions import sync_folders, setup_instances, worker_task, collect_results, delete_instances
+from helper_functions import sync_folders, setup_instances, worker_task, delete_instances
 
 log = logging.getLogger(__name__)
 
@@ -50,6 +38,17 @@ class SetupOperator(BaseOperator):
         log.info("Instance info received: " + str(instance_info))
         setup_instances(instances=instance_info['instances'])
         log.info("Instances created")
+
+
+class SleepOperator(BaseOperator):
+    @apply_defaults
+    def __init__(self, op_param, *args, **kwargs):
+        self.operator_param = op_param
+        super(SleepOperator, self).__init__(*args, **kwargs)
+
+    def execute(self, context):
+        log.info("sleeping... Zzzz.....")
+        time.sleep(5)
 
 
 class BlockSensorOperator(BaseSensorOperator):
@@ -114,6 +113,7 @@ class GcePlugin(AirflowPlugin):
     operators = [
         SyncOperator,
         SetupOperator,
+        SleepOperator,
         BlockSensorOperator,
         WorkerOperator,
         CompletionOperator
