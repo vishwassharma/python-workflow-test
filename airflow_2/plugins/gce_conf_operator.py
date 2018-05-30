@@ -47,8 +47,8 @@ class SleepOperator(BaseOperator):
         super(SleepOperator, self).__init__(*args, **kwargs)
 
     def execute(self, context):
-        log.info("sleeping... Zzzz.....")
-        time.sleep(5)
+        log.info("sleeping... for {}. Zzzz.....".format(self.operator_param['sleep_time']))
+        time.sleep(self.operator_param['sleep_time'])
 
 
 class BlockSensorOperator(BaseSensorOperator):
@@ -73,6 +73,7 @@ class BlockSensorOperator(BaseSensorOperator):
         log.info("count: " + str(count))
         log.info("total_instance: " + str(total_instance))
         if count == total_instance:
+            task_instance.xcom_push(key='complete', value=True)
             return True
         return False
 
@@ -94,6 +95,22 @@ class WorkerOperator(BaseOperator):
         task_instance.xcom_push(key="work", value=True)
 
 
+class WorkerBlockSensorOperator(BaseSensorOperator):
+    @apply_defaults
+    def __init__(self, op_param, *args, **kwargs):
+        self.operator_param = op_param
+        super(WorkerBlockSensorOperator, self).__init__(*args, **kwargs)
+
+    def poke(self, context):
+        task_instance = context['ti']
+        block_status = task_instance.xcom_pull(key='complete', task_ids='blocking_task')
+        log.info("parent worker blocking task complete: " + str(block_status))
+        if block_status == True:
+            time.sleep(5)
+            return True
+        return False
+
+
 class CompletionOperator(BaseOperator):
     @apply_defaults
     def __init__(self, op_param, *args, **kwargs):
@@ -101,6 +118,8 @@ class CompletionOperator(BaseOperator):
         super(CompletionOperator, self).__init__(*args, **kwargs)
 
     def execute(self, context):
+        # so that the workers complete their blocking task before termination and notifying the server
+        time.sleep(30)
         log.info("deleting instances")
         instance_info = context['ti'].xcom_pull(key='instance_info', task_ids='sync_task')
         log.info("Instance info received: " + str(instance_info))
@@ -116,5 +135,6 @@ class GcePlugin(AirflowPlugin):
         SleepOperator,
         BlockSensorOperator,
         WorkerOperator,
+        WorkerBlockSensorOperator,
         CompletionOperator
     ]

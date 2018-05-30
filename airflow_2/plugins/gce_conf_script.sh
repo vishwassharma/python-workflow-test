@@ -23,11 +23,12 @@ pip install airflow==1.8.0
 pip install airflow[celery]==1.8.0
 pip install configparser
 pip install --upgrade google-api-python-client
+pip install python-dotenv
 pip install google-auth-httplib2
 pip install google-cloud
 
 # downloading data from buckets
-wget https://storage.googleapis.com/central.rtheta.in/folder_sync//home/rtheta/PycharmProjects/rtheta_learning/airflow_2/plugins/instance_blob_download.py
+wget https://storage.googleapis.com/central.rtheta.in/instance_blob_download.py
 python instance_blob_download.py
 
 export C_FORCE_ROOT=true

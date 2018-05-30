@@ -219,7 +219,7 @@ def setup_instances(instances):
     sleep()
     project = os.environ.get("PROJECT_NAME", "")
     bucket = os.environ.get("BUCKET_NAME", "")
-    zone = os.environ.get("PROJECT_NAME", "")
+    zone = os.environ.get("ZONE", "")
     compute = discovery.build('compute', 'v1')
     for instance in instances:
         print('Creating instance.')
