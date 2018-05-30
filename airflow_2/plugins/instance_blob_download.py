@@ -11,7 +11,6 @@ def make_dirs(path):
 
 
 def download_blob(bucket_name='central.rtheta.in', source_blob_name='folder_sync'):
-    """Uploads a file to the bucket."""
     storage_client = storage.Client()
     bucket = storage_client.get_bucket(bucket_name)
     blobs = bucket.list_blobs()

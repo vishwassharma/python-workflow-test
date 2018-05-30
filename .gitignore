@@ -1,4 +1,5 @@
 .idea
+.env
 *output_ORIG*
 *.pyc
 others

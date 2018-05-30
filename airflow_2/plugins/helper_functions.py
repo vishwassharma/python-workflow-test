@@ -1,13 +1,12 @@
-import time
-import uuid
-from googleapiclient import discovery
-import argparse
 import os
 import time
+from stat import *
+import dotenv
+
+from googleapiclient import discovery
+from google.cloud import storage
 
 import log_parser
-
-os.environ['GOOGLE_APPLICATION_CREDENTIALS'] = '/home/rtheta/PycharmProjects/rtheta_learning/auth.ansible.json'
 
 
 def wait_for_operation(compute, project, zone, operation):
@@ -28,9 +27,8 @@ def wait_for_operation(compute, project, zone, operation):
 
 
 def create_instance(compute, project, zone, name, bucket):
-    # Get the latest Debian Jessie image.
+    # Get the latest Ubuntu 16.04 image.
     image_response = compute.images().getFromFamily(
-        # project='debian-cloud', family='debian-8').execute()
         project='ubuntu-os-cloud', family='ubuntu-1604-lts').execute()
     source_disk_image = image_response['selfLink']
 
@@ -39,14 +37,8 @@ def create_instance(compute, project, zone, name, bucket):
     startup_script = open(
         os.path.join(
             os.path.dirname(__file__), 'gce_conf_script.sh'), 'r').read()
-    image_url = "http://storage.googleapis.com/gce-demo-input/photo.jpg"
-    image_caption = "Ready for dessert?"
-
-    # # TODO: try to do this in more secure way... -_-
-    # auth_file = open(os.environ.get('GOOGLE_APPLICATION_CREDENTIALS'))
-    #
-    # auth_command = "echo \'" + auth_file.read() + "\' >> auth.ansible.json \n"
-    # startup_script = auth_command + startup_script
+    # image_url = "http://storage.googleapis.com/gce-demo-input/photo.jpg"
+    # image_caption = "Ready for dessert?"
 
     config = {
         'name': name,
@@ -90,12 +82,6 @@ def create_instance(compute, project, zone, name, bucket):
                 'key': 'startup-script',
                 'value': startup_script
             }, {
-                'key': 'url',
-                'value': image_url
-            }, {
-                'key': 'text',
-                'value': image_caption
-            }, {
                 'key': 'bucket',
                 'value': bucket
             }]
@@ -120,45 +106,8 @@ def list_instances(compute, project, zone):
     return result['items']
 
 
-# def main(project, bucket, zone, instance_name, wait=True):
-#     compute = discovery.build('compute', 'v1')
-#
-#     print('Creating instance.')
-#
-#     operation = create_instance(compute, project, zone, instance_name, bucket)
-#     wait_for_operation(compute, project, zone, operation['name'])
-#
-#     instances = list_instances(compute, project, zone)
-#
-#     print('Instances in project %s and zone %s:' % (project, zone))
-#     for instance in instances:
-#         print(' - ' + instance['name'])
-#
-#     print("""
-# Instance created.
-# It will take a minute or two for the instance to complete work.
-# Check this URL: http://storage.googleapis.com/{}/output.png
-# Once the image is uploaded press enter to delete the instance.
-# """.format(bucket))
-#
-#     if wait:
-#         input("Press any key to delete the instance...")
-#
-#     print('Deleting instance.')
-#
-#     operation = delete_instance(compute, project, zone, instance_name)
-#     wait_for_operation(compute, project, zone, operation['name'])
-
-
 def sleep(seconds=0):
     time.sleep(seconds)
-
-
-import os
-from stat import *
-from google.cloud import storage
-
-os.environ['GOOGLE_APPLICATION_CREDENTIALS'] = '/home/vishwas/PycharmProjects/rtheta_learning/auth.ansible.json'
 
 
 def make_dirs(path):
@@ -169,28 +118,17 @@ def make_dirs(path):
         os.mkdir(path)
 
 
-def upload_blob(bucket_name='central.rtheta.in',
+def upload_blob(bucket_name=os.environ.get("BUCKET_NAME", ""),
                 source_file_name='/home/rtheta/PycharmProjects/rtheta_learning/airflow_2',
                 destination_blob_name='folder_sync'):
     """Uploads a file to the bucket."""
     storage_client = storage.Client()
     bucket = storage_client.get_bucket(bucket_name)
-    # for listing the blobs
-    # blobs = bucket.list_blobs()
-    # for blob in blobs:
-    #     print(blob.name)
-    #     if blob.name.__contains__("airflow.cfg"):
-    #         blob.download_to_filename('/home/rtheta/PycharmProjects/rtheta_learning/others/blah22')
-    #         print("file downloaded")
-
     blob = bucket.blob(destination_blob_name)
     blob.upload_from_filename(source_file_name)
-    # print('File {} uploaded to {}.'.format(
-    #     source_file_name,
-    #     destination_blob_name))
 
 
-def download_blob_by_name(bucket_name='central.rtheta.in', source_blob_name='folder_sync'):
+def download_blob_by_name(bucket_name=os.environ.get("BUCKET_NAME", ""), source_blob_name='folder_sync'):
     """Uploads a file to the bucket."""
     storage_client = storage.Client()
     bucket = storage_client.get_bucket(bucket_name)
@@ -208,8 +146,6 @@ def walktree_to_upload(top='/home/rtheta/PycharmProjects/rtheta_learning/airflow
     recursively descend the directory tree rooted at top,
        calling the callback function for each regular file
     """
-    # print(top)
-
     if top.__contains__(".git") or top.__contains__("/logs/") or top.__contains__(".idea"):
         return
     for f in os.listdir(top):
@@ -222,15 +158,10 @@ def walktree_to_upload(top='/home/rtheta/PycharmProjects/rtheta_learning/airflow
             if f.endswith(".pyc"):  # or f.startswith(".idea"):
                 continue
             # It's a file, call the callback function
-            callback('central.rtheta.in', pathname, 'folder_sync/' + pathname)
-            # callback(pathname)
+            callback(os.environ.get("BUCKET_NAME", ""), pathname, 'folder_sync/' + pathname)
         else:
             # Unknown file type, print a message
             print('Skipping %s' % pathname)
-
-
-# def visitfile(file):              # testing function for walktree function
-#     print('visiting', file)
 
 
 def assign_files(instance_no, total_instances):
@@ -238,7 +169,7 @@ def assign_files(instance_no, total_instances):
     assigns files to the instances
     """
     storage_client = storage.Client()
-    bucket = storage_client.get_bucket('central.rtheta.in')
+    bucket = storage_client.get_bucket(os.environ.get("BUCKET_NAME", ""))
     # # for listing the blobs
     blobs_iter = bucket.list_blobs()
     blob_list = list(blobs_iter)
@@ -267,49 +198,34 @@ def assign_files(instance_no, total_instances):
     return [blob for blob in req_blob[start:end]]
 
 
-def sync_folders(*args, **kwargs):
+def sync_folders(blob_name='folder_sync', *args, **kwargs):
     """
     To sync the folders with the cloud storage for the instances to pull
     """
     sleep()
     storage_client = storage.Client()
-    bucket = storage_client.get_bucket('central.rtheta.in')
+    bucket = storage_client.get_bucket(os.environ.get("BUCKET_NAME", ""))
     blob_list = bucket.list_blobs()
     for blob in blob_list:
-        if blob.name.__contains__('folder_sync'):
+        if blob.name.__contains__(blob_name):
             bucket.delete_blob(blob.name)
     walktree_to_upload()
 
 
-def setup_instances(instances, *args, **kwargs):
+def setup_instances(instances):
     """
     will create instances, has to run on local/permanent machine
     """
     sleep()
-    project = 'rtheta-central'
-    bucket = 'central.rtheta.in'
-    zone = 'us-central1-a'
+    project = os.environ.get("PROJECT_NAME", "")
+    bucket = os.environ.get("BUCKET_NAME", "")
+    zone = os.environ.get("PROJECT_NAME", "")
     compute = discovery.build('compute', 'v1')
     for instance in instances:
-        # instance = uuid.uuid4()
-
         print('Creating instance.')
-
         operation = create_instance(compute, project, zone, instance, bucket)
         wait_for_operation(compute, project, zone, operation['name'])
         print("instance {} created".format(instance))
-        # instances = list_instances(compute, project, zone)
-
-        #     print('Instances in project %s and zone %s:' % (project, zone))
-        #     for instance in list_instances:
-        #         print(' - ' + instance['name'])
-        #
-        #     print("""
-        # Instance created.
-        # It will take a minute or two for the instance to complete work.
-        # Check this URL: http://storage.googleapis.com/{}/output.png
-        # Once the image is uploaded press enter to delete the instance.
-        #     """.format(bucket))
 
 
 def worker_task(instance_no, total_instances, logger=None, *args, **kwargs):
@@ -318,21 +234,23 @@ def worker_task(instance_no, total_instances, logger=None, *args, **kwargs):
     arguments contains the various parameters that will
     be used by the machines to process the data like file numbers
     """
+    dotenv.load_dotenv(dotenv.find_dotenv())
     sleep()
     assigned_blobs = assign_files(instance_no=instance_no, total_instances=total_instances)
-    for blob in assigned_blobs:     # downloading bin files
-        blob.download_to_filename(filename=blob.name.replace('folder_sync/', ''))
+    for blob in assigned_blobs:  # downloading bin files
+        blob.download_to_filename(filename=blob.name.replace('bin_log/', ''))
     for blob in assigned_blobs:
-        # TODO: pass a proper storage name or location
-        log_parser.main(logger, filename=blob.name.replace('folder_sync/', ''))
+        log_parser.main(logger,
+                        filename=blob.name.replace('bin_log', ''),
+                        # save_filename="/home/rtheta/parsed_files/" + os.path.basename(
+                        #     blob.name.replace('bin_log/', '')))
+                        save_filename=blob.name.replace('bin_log/', '').replace('.bin', '.json').replace("rtheta/",
+                                                                                                         "rtheta/persed/"))
 
-
-def collect_results(*args, **kwargs):
-    """
-    no need of this task :P. This all can be handled in worker_task only :sweat_sweat_smile:
-    """
-    sleep()
-    pass
+    for blob in assigned_blobs:
+        filename = blob.name.replace('bin_log/', '').replace('.bin', '.json').replace("rtheta/", "rtheta/persed/")
+        upload_blob(source_file_name=filename,
+                    destination_blob_name="json_log/" + filename)
 
 
 def delete_instances(instances, *args, **kwargs):
@@ -340,22 +258,10 @@ def delete_instances(instances, *args, **kwargs):
     has to run on the local/permanent machine to destroy the instances after completion of work.
     """
     sleep()
-    project = 'rtheta-central'
-    bucket = 'central.rtheta.in'
-    zone = 'us-central1-a'
-    # instance_name = 'test1'
+    project = os.environ.get("PROJECT_NAME", "")
+    zone = os.environ.get("ZONE", "")
     for instance in instances:
         compute = discovery.build('compute', 'v1')
         operation = delete_instance(compute, project, zone, instance)
         wait_for_operation(compute, project, zone, operation['name'])
         print("instance {} deleted...".format(instance))
-
-
-"""
-Parser is linked to worker task
-Download the assigned files in the worker
-
-TODO:
-
-
-"""
