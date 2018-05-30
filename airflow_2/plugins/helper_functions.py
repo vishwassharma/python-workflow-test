@@ -190,7 +190,7 @@ def upload_blob(bucket_name='central.rtheta.in',
     #     destination_blob_name))
 
 
-def download_blob(bucket_name='central.rtheta.in', source_blob_name='folder_sync'):
+def download_blob_by_name(bucket_name='central.rtheta.in', source_blob_name='folder_sync'):
     """Uploads a file to the bucket."""
     storage_client = storage.Client()
     bucket = storage_client.get_bucket(bucket_name)
@@ -300,16 +300,16 @@ def setup_instances(instances, *args, **kwargs):
         print("instance {} created".format(instance))
         # instances = list_instances(compute, project, zone)
 
-    #     print('Instances in project %s and zone %s:' % (project, zone))
-    #     for instance in list_instances:
-    #         print(' - ' + instance['name'])
-    #
-    #     print("""
-    # Instance created.
-    # It will take a minute or two for the instance to complete work.
-    # Check this URL: http://storage.googleapis.com/{}/output.png
-    # Once the image is uploaded press enter to delete the instance.
-    #     """.format(bucket))
+        #     print('Instances in project %s and zone %s:' % (project, zone))
+        #     for instance in list_instances:
+        #         print(' - ' + instance['name'])
+        #
+        #     print("""
+        # Instance created.
+        # It will take a minute or two for the instance to complete work.
+        # Check this URL: http://storage.googleapis.com/{}/output.png
+        # Once the image is uploaded press enter to delete the instance.
+        #     """.format(bucket))
 
 
 def worker_task(instance_no, total_instances, logger=None, *args, **kwargs):
@@ -319,10 +319,12 @@ def worker_task(instance_no, total_instances, logger=None, *args, **kwargs):
     be used by the machines to process the data like file numbers
     """
     sleep()
-    # TODO: download the files in all the workers or download the files on go as the worker iterates the list
     assigned_blobs = assign_files(instance_no=instance_no, total_instances=total_instances)
+    for blob in assigned_blobs:     # downloading bin files
+        blob.download_to_filename(filename=blob.name.replace('folder_sync/', ''))
     for blob in assigned_blobs:
-        log_parser.main(logger, filename=blob.name)     # TODO: pass a proper storage name or location
+        # TODO: pass a proper storage name or location
+        log_parser.main(logger, filename=blob.name.replace('folder_sync/', ''))
 
 
 def collect_results(*args, **kwargs):
@@ -347,3 +349,13 @@ def delete_instances(instances, *args, **kwargs):
         operation = delete_instance(compute, project, zone, instance)
         wait_for_operation(compute, project, zone, operation['name'])
         print("instance {} deleted...".format(instance))
+
+
+"""
+Parser is linked to worker task
+Download the assigned files in the worker
+
+TODO:
+
+
+"""
