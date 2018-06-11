@@ -123,7 +123,7 @@ class CompletionOperator(BaseOperator):
         log.info("deleting instances")
         instance_info = context['ti'].xcom_pull(key='instance_info', task_ids='sync_task')
         log.info("Instance info received: " + str(instance_info))
-        delete_instances(instances=instance_info['instances'])
+        # delete_instances(instances=instance_info['instances'])
         log.info("Instances deleted")
 
 

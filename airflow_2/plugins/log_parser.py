@@ -123,8 +123,8 @@ def main(logger=None, filename='test.bin', save_filename=""):
         bin_data = bin_data[header.msg_len:]
         arr.append(iter_data)
 
-        if (counter % 10000 or bin_data) and logger:
-            logger.info("File: {}, count: {}".format(filename, counter))
+        if counter % 1000 and bin_data and logger:
+            print ("File: {}, count: {}".format(filename, counter))
 
     json.dump({
         'heartbeat': heartbeat,

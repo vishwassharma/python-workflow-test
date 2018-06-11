@@ -7,3 +7,6 @@ airflow/logs
 airflow_2/logs
 auth.ansible.json
 *airflow-webserver.pid
+airflow_2/.worker_env
+bin_files
+

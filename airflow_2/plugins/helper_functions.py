@@ -155,7 +155,7 @@ def walktree_to_upload(top=os.environ.get("AIRFLOW_HOME", ""), callback=upload_b
             # It's a directory, recurse into it
             walktree_to_upload(pathname, callback)
         elif S_ISREG(mode):
-            if f.endswith(".pyc"):  # or f.startswith(".idea"):
+            if f.endswith(".pyc") or f.endswith('.env'):  # or f.startswith(".idea"):
                 continue
             # It's a file, call the callback function
             callback(os.environ.get("BUCKET_NAME", ""), pathname, 'folder_sync/' + pathname)
@@ -234,23 +234,23 @@ def worker_task(instance_no, total_instances, logger=None, *args, **kwargs):
     arguments contains the various parameters that will
     be used by the machines to process the data like file numbers
     """
-    dotenv.load_dotenv(dotenv.find_dotenv())
-    sleep(5)
-    # assigned_blobs = assign_files(instance_no=instance_no, total_instances=total_instances)
-    # for blob in assigned_blobs:  # downloading bin files
-    #     blob.download_to_filename(filename=blob.name.replace('bin_log/', ''))
-    # for blob in assigned_blobs:
-    #     log_parser.main(logger,
-    #                     filename=blob.name.replace('bin_log', ''),
-    #                     # save_filename="/home/rtheta/parsed_files/" + os.path.basename(
-    #                     #     blob.name.replace('bin_log/', '')))
-    #                     save_filename=blob.name.replace('bin_log/', '').replace('.bin', '.json').replace("rtheta/",
-    #                                                                                                      "rtheta/persed/"))
-    #
-    # for blob in assigned_blobs:
-    #     filename = blob.name.replace('bin_log/', '').replace('.bin', '.json').replace("rtheta/", "rtheta/persed/")
-    #     upload_blob(source_file_name=filename,
-    #                 destination_blob_name="json_log/" + filename)
+    dotenv.load_dotenv("./.worker_env")
+    assigned_blobs = assign_files(instance_no=instance_no, total_instances=total_instances)
+    logger.info('Blobs assigned: ' + str(assigned_blobs))
+    for blob in assigned_blobs:  # downloading bin files
+        make_dirs(os.path.dirname(blob.name.replace('bin_log/', '')))
+        blob.download_to_filename(filename=blob.name.replace('bin_log/', ''))
+        logger.info('File Downloaded: ' + str(blob.name))
+
+    for blob in assigned_blobs:
+        save_filename = blob.name.replace('bin_log/', '').replace('.bin', '.json').replace("rtheta/", "rtheta/persed/")
+        make_dirs(os.path.dirname(save_filename))
+        log_parser.main(logger, filename=blob.name.replace('bin_log', ''), save_filename=save_filename)
+
+    for blob in assigned_blobs:
+        filename = blob.name.replace('bin_log/', '').replace('.bin', '.json').replace("rtheta/", "rtheta/persed/")
+        upload_blob(source_file_name=filename,
+                    destination_blob_name="json_log/" + filename)
 
 
 def delete_instances(instances, *args, **kwargs):
