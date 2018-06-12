@@ -44,7 +44,7 @@ for instance_no in range(len(instance_info['instances'])):
     # sleep task is arranged in parallel to blocking_sensor to eliminate the changes of scheduling
     # worker task before it so that the permanent worker (the one that is supposed to create and
     # destroy instances doesn't get the worker task
-    sTask = SleepOperator(op_param={"sleep_time": 1}, task_id='sleep_task' + str(instance_no), dag=dag)
+    sTask = SleepOperator(op_param={"sleep_time": 0}, task_id='sleep_task' + str(instance_no), dag=dag)
     wTask = WorkerOperator(op_param={"number": instance_no, "total": NO_OF_INSTANCES},
                            task_id='worker_task' + str(instance_no), dag=dag)
 

@@ -36,7 +36,7 @@ export C_FORCE_ROOT=true
 
 
 # change the directories to airflow home
-cd  /home/rtheta/PycharmProjects/rtheta_learning/airflow_2
+cd  /home/rtheta/PycharmProjects/rtheta_learning/airflow
 export AIRFLOW_HOME="`pwd`"
 
 
