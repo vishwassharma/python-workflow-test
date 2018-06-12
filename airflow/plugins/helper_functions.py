@@ -8,10 +8,17 @@ from googleapiclient import discovery
 
 import log_parser
 
-# from airflow.constants import DESTINATION_BLOB_NAME
+os.environ['PROJECT_NAME'] = "rtheta-central"
+os.environ['BUCKET_NAME'] = "central.rtheta.in"
+os.environ['ZONE'] = "asia-south1-a"
+
 DESTINATION_BLOB_NAME = 'airflow_home'
 BINARY_FILE_BLOB_NAME = 'bin_log'
 PROCESSED_DATA_BLOB_NAME = 'json_log'
+
+
+def print_alias(*args):
+    print args
 
 
 def wait_for_operation(compute, project, zone, operation):
@@ -261,37 +268,50 @@ def worker_task(instance_no, total_instances, logger=None, *args, **kwargs):
     get the task for the worker
     arguments contains the various parameters that will
     be used by the machines to process the data like file numbers
+    instance_no belongs to [0, total_instances - 1]
     """
+    if logger:
+        log_info = logger.info
+    else:
+        log_info = print_alias
+
     dotenv.load_dotenv("./.worker_env")  # TODO: find a way around
 
     BIN_DATA_STORAGE = os.path.expanduser('~/raw_data')
     PROCESSED_DATA_STORAGE = os.path.expanduser('~/' + PROCESSED_DATA_BLOB_NAME)
 
     assigned_blobs = assign_files(instance_no=instance_no, total_instances=total_instances)
-    if logger:
-        logger.info('Blobs assigned: ' + str(assigned_blobs))
-    else:
-        print 'Blobs assigned: ' + str(assigned_blobs)
+    log_info("Instance_no: {}".format(instance_no))
+    log_info('Blobs assigned: ' + str(assigned_blobs))
 
+    # downloading the files
     file_names = []
     for blob in assigned_blobs:  # downloading bin files
-        filename = os.path.join(BIN_DATA_STORAGE + blob.name.replace(BINARY_FILE_BLOB_NAME + '/', ''))
+        rel_file_name = blob.name.replace(BINARY_FILE_BLOB_NAME + '/', '')
+        filename = os.path.join(BIN_DATA_STORAGE, rel_file_name)
         make_dirs(os.path.dirname(filename))
         blob.download_to_filename(filename)
-        logger.info('File {} downloaded to {}'.format(str(blob.name), filename))
+        log_info('File {} downloaded to {}'.format(str(blob.name), filename))
         file_names.append(filename)
 
-    save_filenames = []
+    save_names = []
+    upload_names = []
     for filename in file_names:
+        # processing the file
         save_filename = filename.replace(BIN_DATA_STORAGE, PROCESSED_DATA_STORAGE).replace('.bin', '.json')
         make_dirs(os.path.dirname(save_filename))
         log_parser.main(logger, filename=filename, save_filename=save_filename)
-        save_filenames.append(save_filename)
+        save_names.append(save_filename)
 
-    for save_filename in save_filenames:
+        # uploading the file
         upload_name = save_filename.replace(os.path.expanduser('~/'), '')
         upload_blob(source_file_name=save_filename,
                     destination_blob_name=upload_name)
+        upload_names.append(upload_name)
+
+        # print "file_names: {}".format(file_names)
+        # print "save_names: {}".format(save_names)
+        # print "upload_names: {}".format(upload_names)
 
 
 def delete_instances(instances):
@@ -307,13 +327,17 @@ def delete_instances(instances):
         wait_for_operation(compute, project, zone, operation['name'])
         print("instance {} deleted...".format(instance))
 
-
-if __name__ == "__main__":
-    # def pr(*args):
-    #     print args
-    #
-    #
-    # os.environ['AIRFLOW_HOME'] = "/home/rtheta/parser_pipeline/airflow"
-    # print DESTINATION_BLOB_NAME
-    # walktree_to_upload("/home/rtheta/parser_pipeline/airflow", pr)
-    sync_folders()
+# if __name__ == "__main__":
+#     # def pr(*args):
+#     #     print args
+#     #
+#     #
+#     # os.environ['AIRFLOW_HOME'] = "/home/rtheta/parser_pipeline/airflow"
+#     # print DESTINATION_BLOB_NAME
+#     # walktree_to_upload("/home/rtheta/parser_pipeline/airflow", pr)
+#     # sync_folders()
+#
+#     worker_task(0, 3)
+#     worker_task(1, 3)
+#     worker_task(2, 3)
+#     # pass

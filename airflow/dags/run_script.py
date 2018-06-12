@@ -1,5 +1,5 @@
 import uuid
-import dotenv
+# import dotenv
 from datetime import timedelta
 import airflow
 from airflow.operators import (SyncOperator,
@@ -10,7 +10,7 @@ from airflow.operators import (SyncOperator,
                                WorkerBlockSensorOperator,
                                CompletionOperator, )
 
-dotenv.load_dotenv(dotenv.find_dotenv())
+# dotenv.load_dotenv(dotenv.find_dotenv())
 
 # TODO: remove the hard-coding for three instances and make it dynamic
 

@@ -20,10 +20,10 @@ class SyncOperator(BaseOperator):
     def execute(self, context):
         log.info("Sync in progress...")
         sync_folders()
+        log.info("Sync complete...")
         log.info("Instance info received: " + str(self.operator_param['instance_info']))
         task_instance = context['ti']
         task_instance.xcom_push(key='instance_info', value=self.operator_param['instance_info'])
-        log.info("Sync complete...")
 
 
 class SetupOperator(BaseOperator):
@@ -123,7 +123,7 @@ class CompletionOperator(BaseOperator):
         log.info("deleting instances")
         instance_info = context['ti'].xcom_pull(key='instance_info', task_ids='sync_task')
         log.info("Instance info received: " + str(instance_info))
-        # delete_instances(instances=instance_info['instances'])
+        delete_instances(instances=instance_info['instances'])
         log.info("Instances deleted")
 
 
