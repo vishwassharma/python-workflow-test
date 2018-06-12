@@ -7,7 +7,11 @@ from google.cloud import storage
 from googleapiclient import discovery
 
 import log_parser
-from airflow.constants import DESTINATION_BLOB_NAME
+
+# from airflow.constants import DESTINATION_BLOB_NAME
+DESTINATION_BLOB_NAME = 'folder_sync'
+BINARY_FILE_BLOB_NAME = 'bin_log'
+PROCESSED_DATA_BLOB_NAME = 'json_log'
 
 
 def wait_for_operation(compute, project, zone, operation):
@@ -28,6 +32,8 @@ def wait_for_operation(compute, project, zone, operation):
             return result
 
         time.sleep(1)
+
+
 def create_instance(compute, project, zone, name, bucket):
     """
     Creates a compute instance on the google cloud platform
@@ -96,6 +102,8 @@ def create_instance(compute, project, zone, name, bucket):
         project=project,
         zone=zone,
         body=config).execute()
+
+
 def delete_instance(compute, project, zone, name):
     """
     Terminates an instance from the google cloud platform
@@ -104,17 +112,23 @@ def delete_instance(compute, project, zone, name):
         project=project,
         zone=zone,
         instance=name).execute()
+
+
 def list_instances(compute, project, zone):
     """
     list all the active instances
     """
     result = compute.instances().list(project=project, zone=zone).execute()
     return result['items']
+
+
 def sleep(seconds=0):
     """
     function for sleep
     """
     time.sleep(seconds)
+
+
 def make_dirs(path):
     """
     Checks for a path it is exists if not, it creates one
@@ -124,6 +138,8 @@ def make_dirs(path):
     else:
         make_dirs(os.path.dirname(path))
         os.mkdir(path)
+
+
 def upload_blob(bucket_name=os.environ.get("BUCKET_NAME", ""),
                 source_file_name=os.environ.get("AIRFLOW_HOME", ""),
                 destination_blob_name=DESTINATION_BLOB_NAME):
@@ -134,18 +150,19 @@ def upload_blob(bucket_name=os.environ.get("BUCKET_NAME", ""),
     blob.upload_from_filename(source_file_name)
 
 
-def download_blob_by_name(bucket_name=os.environ.get("BUCKET_NAME", ""), source_blob_name=DESTINATION_BLOB_NAME):
-    """Uploads a file to the bucket."""
-    # TODO: Check here for source of downloading and for path where its saved
-    storage_client = storage.Client()
-    bucket = storage_client.get_bucket(bucket_name)
-    blobs = bucket.list_blobs()
-    for blob in blobs:
-        if blob.name.startswith(source_blob_name):
-            # download the blob (file in its folder)
-            file_path = blob.name.replace(source_blob_name, "")
-            make_dirs(os.path.dirname(file_path))  # for creating the path recursively
-            blob.download_to_filename(file_path)
+# TODO: Not useful at the moment
+# def download_blob_by_name(bucket_name=os.environ.get("BUCKET_NAME", ""), source_blob_name=DESTINATION_BLOB_NAME):
+#     """Uploads a file to the bucket."""
+#     # TODO: Check here for source of downloading and for path where its saved
+#     storage_client = storage.Client()
+#     bucket = storage_client.get_bucket(bucket_name)
+#     blobs = bucket.list_blobs()
+#     for blob in blobs:
+#         if blob.name.startswith(source_blob_name):
+#             # download the blob (file in its folder)
+#             file_path = blob.name.replace(source_blob_name, "")
+#             make_dirs(os.path.dirname(file_path))  # for creating the path recursively
+#             blob.download_to_filename(file_path)
 
 
 def walktree_to_upload(top=os.environ.get("AIRFLOW_HOME", ""), callback=upload_blob):
@@ -166,7 +183,10 @@ def walktree_to_upload(top=os.environ.get("AIRFLOW_HOME", ""), callback=upload_b
             if f.endswith(".pyc") or f.endswith('.env'):  # or f.startswith(".idea"):
                 continue
             # It's a file, call the callback function
-            callback(os.environ.get("BUCKET_NAME", ""), pathname, DESTINATION_BLOB_NAME + pathname)
+            file_blob_name = os.path.join(DESTINATION_BLOB_NAME,
+                                          pathname.replace(os.environ.get("AIRFLOW_HOME", "") + "/", ""))
+            # The BLOB_NAME will act as the airflow home directory
+            callback(os.environ.get("BUCKET_NAME", ""), pathname, file_blob_name)
         else:
             # Unknown file type, print a message
             print('Skipping %s' % pathname)
@@ -184,7 +204,7 @@ def assign_files(instance_no, total_instances):
 
     req_blob = []
     for blob in blob_list:
-        if blob.name.__contains__('bin_log'):
+        if blob.name.__contains__(BINARY_FILE_BLOB_NAME):
             req_blob.append(blob)
 
     q = len(req_blob) // total_instances
@@ -242,27 +262,36 @@ def worker_task(instance_no, total_instances, logger=None, *args, **kwargs):
     arguments contains the various parameters that will
     be used by the machines to process the data like file numbers
     """
-    # TODO: A lot of path hardcoding
-    dotenv.load_dotenv("./.worker_env")
+    dotenv.load_dotenv("./.worker_env")  # TODO: find a way around
+
+    BIN_DATA_STORAGE = os.path.expanduser('~/raw_data')
+    PROCESSED_DATA_STORAGE = os.path.expanduser('~/' + PROCESSED_DATA_BLOB_NAME)
+
     assigned_blobs = assign_files(instance_no=instance_no, total_instances=total_instances)
     logger.info('Blobs assigned: ' + str(assigned_blobs))
+
+    file_names = []
     for blob in assigned_blobs:  # downloading bin files
-        make_dirs(os.path.dirname(blob.name.replace('bin_log/', '')))
-        blob.download_to_filename(filename=blob.name.replace('bin_log/', ''))
-        logger.info('File Downloaded: ' + str(blob.name))
+        filename = os.path.join(BIN_DATA_STORAGE + blob.name.replace(BINARY_FILE_BLOB_NAME + '/', ''))
+        make_dirs(os.path.dirname(filename))
+        blob.download_to_filename(filename)
+        logger.info('File {} downloaded to {}'.format(str(blob.name), filename))
+        file_names.append(filename)
 
-    for blob in assigned_blobs:
-        save_filename = blob.name.replace('bin_log/', '').replace('.bin', '.json').replace("rtheta/", "rtheta/persed/")
+    save_filenames = []
+    for filename in file_names:
+        save_filename = filename.replace(BIN_DATA_STORAGE, PROCESSED_DATA_STORAGE).replace('.bin', '.json')
         make_dirs(os.path.dirname(save_filename))
-        log_parser.main(logger, filename=blob.name.replace('bin_log', ''), save_filename=save_filename)
+        log_parser.main(logger, filename=filename, save_filename=save_filename)
+        save_filenames.append(save_filename)
 
-    for blob in assigned_blobs:
-        filename = blob.name.replace('bin_log/', '').replace('.bin', '.json').replace("rtheta/", "rtheta/persed/")
-        upload_blob(source_file_name=filename,
-                    destination_blob_name="json_log/" + filename)
+    for save_filename in save_filenames:
+        upload_name = save_filename.replace(os.path.expanduser('~/'), '')
+        upload_blob(source_file_name=save_filename,
+                    destination_blob_name=upload_name)
 
 
-def delete_instances(instances, *args, **kwargs):
+def delete_instances(instances):
     """
     has to run on the local/permanent machine to destroy the instances after completion of work.
     """
@@ -274,3 +303,13 @@ def delete_instances(instances, *args, **kwargs):
         operation = delete_instance(compute, project, zone, instance)
         wait_for_operation(compute, project, zone, operation['name'])
         print("instance {} deleted...".format(instance))
+
+
+if __name__ == "__main__":
+    def pr(*args):
+        print args
+
+
+    os.environ['AIRFLOW_HOME'] = "/home/rtheta/parser_pipeline/airflow"
+    print DESTINATION_BLOB_NAME
+    walktree_to_upload("/home/rtheta/parser_pipeline/airflow", pr)

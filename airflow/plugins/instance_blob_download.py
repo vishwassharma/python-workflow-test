@@ -11,6 +11,7 @@ def make_dirs(path):
 
 
 def download_blob(bucket_name='central.rtheta.in', source_blob_name='folder_sync'):
+    # TODO: remove the hardcoding
     storage_client = storage.Client()
     bucket = storage_client.get_bucket(bucket_name)
     blobs = bucket.list_blobs()
