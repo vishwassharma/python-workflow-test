@@ -27,7 +27,10 @@ pip install python-dotenv
 pip install google-auth-httplib2
 pip install google-cloud
 
+export AIRFLOW_HOME='/home/rtheta/airflow'
+
 # downloading data from buckets
+#wget https://storage.googleapis.com/central.rtheta.in/instance_blob_download.py
 wget https://storage.googleapis.com/central.rtheta.in/instance_blob_download.py
 python instance_blob_download.py
 
@@ -37,7 +40,6 @@ export C_FORCE_ROOT=true
 
 # change the directories to airflow home
 cd  /home/rtheta/airflow
-export AIRFLOW_HOME="`pwd`"
 
 export ENV="worker"     # sets env variable for worker. Used to identify server and worker dynamically
 

@@ -9,7 +9,7 @@ from googleapiclient import discovery
 import log_parser
 
 # from airflow.constants import DESTINATION_BLOB_NAME
-DESTINATION_BLOB_NAME = 'folder_sync'
+DESTINATION_BLOB_NAME = 'airflow_home'
 BINARY_FILE_BLOB_NAME = 'bin_log'
 PROCESSED_DATA_BLOB_NAME = 'json_log'
 
@@ -165,7 +165,7 @@ def upload_blob(bucket_name=os.environ.get("BUCKET_NAME", ""),
 #             blob.download_to_filename(file_path)
 
 
-def walktree_to_upload(top=os.environ.get("AIRFLOW_HOME", ""), callback=upload_blob):
+def walktree_to_upload(top=os.environ.get("AIRFLOW_HOME", "/home/rtheta/airflow"), callback=upload_blob):
     """
     recursively descend the directory tree rooted at top,
     calling the callback function for each regular file
@@ -268,7 +268,10 @@ def worker_task(instance_no, total_instances, logger=None, *args, **kwargs):
     PROCESSED_DATA_STORAGE = os.path.expanduser('~/' + PROCESSED_DATA_BLOB_NAME)
 
     assigned_blobs = assign_files(instance_no=instance_no, total_instances=total_instances)
-    logger.info('Blobs assigned: ' + str(assigned_blobs))
+    if logger:
+        logger.info('Blobs assigned: ' + str(assigned_blobs))
+    else:
+        print 'Blobs assigned: ' + str(assigned_blobs)
 
     file_names = []
     for blob in assigned_blobs:  # downloading bin files
@@ -306,10 +309,11 @@ def delete_instances(instances):
 
 
 if __name__ == "__main__":
-    def pr(*args):
-        print args
-
-
-    os.environ['AIRFLOW_HOME'] = "/home/rtheta/parser_pipeline/airflow"
-    print DESTINATION_BLOB_NAME
-    walktree_to_upload("/home/rtheta/parser_pipeline/airflow", pr)
+    # def pr(*args):
+    #     print args
+    #
+    #
+    # os.environ['AIRFLOW_HOME'] = "/home/rtheta/parser_pipeline/airflow"
+    # print DESTINATION_BLOB_NAME
+    # walktree_to_upload("/home/rtheta/parser_pipeline/airflow", pr)
+    sync_folders()
