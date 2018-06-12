@@ -36,9 +36,10 @@ export C_FORCE_ROOT=true
 
 
 # change the directories to airflow home
-cd  /home/rtheta/PycharmProjects/rtheta_learning/airflow
+cd  /home/rtheta/airflow
 export AIRFLOW_HOME="`pwd`"
 
+export ENV="worker"     # sets env variable for worker. Used to identify server and worker dynamically
 
-pip install airflow     # Required!! otherwise it gives some error :/
+pip install airflow    # Required!! otherwise it gives some error =_=
 airflow worker

@@ -1,15 +1,19 @@
 import os
 import time
 from stat import *
-import dotenv
 
-from googleapiclient import discovery
+import dotenv
 from google.cloud import storage
+from googleapiclient import discovery
 
 import log_parser
+from airflow.constants import DESTINATION_BLOB_NAME
 
 
 def wait_for_operation(compute, project, zone, operation):
+    """
+    Waits for an Google cloud function to complete
+    """
     print('Waiting for operation to finish...')
     while True:
         result = compute.zoneOperations().get(
@@ -24,9 +28,10 @@ def wait_for_operation(compute, project, zone, operation):
             return result
 
         time.sleep(1)
-
-
 def create_instance(compute, project, zone, name, bucket):
+    """
+    Creates a compute instance on the google cloud platform
+    """
     # Get the latest Ubuntu 16.04 image.
     image_response = compute.images().getFromFamily(
         project='ubuntu-os-cloud', family='ubuntu-1604-lts').execute()
@@ -34,9 +39,8 @@ def create_instance(compute, project, zone, name, bucket):
 
     # Configure the machine
     machine_type = "zones/%s/machineTypes/n1-standard-1" % zone
-    startup_script = open(
-        os.path.join(
-            os.path.dirname(__file__), 'gce_conf_script.sh'), 'r').read()
+    # TODO: gce_conf_script path hardcoded
+    startup_script = open(os.path.join(os.path.dirname(__file__), 'gce_conf_script.sh'), 'r').read()
     # image_url = "http://storage.googleapis.com/gce-demo-input/photo.jpg"
     # image_caption = "Ready for dessert?"
 
@@ -92,35 +96,37 @@ def create_instance(compute, project, zone, name, bucket):
         project=project,
         zone=zone,
         body=config).execute()
-
-
 def delete_instance(compute, project, zone, name):
+    """
+    Terminates an instance from the google cloud platform
+    """
     return compute.instances().delete(
         project=project,
         zone=zone,
         instance=name).execute()
-
-
 def list_instances(compute, project, zone):
+    """
+    list all the active instances
+    """
     result = compute.instances().list(project=project, zone=zone).execute()
     return result['items']
-
-
 def sleep(seconds=0):
+    """
+    function for sleep
+    """
     time.sleep(seconds)
-
-
 def make_dirs(path):
+    """
+    Checks for a path it is exists if not, it creates one
+    """
     if os.path.exists(path):
         return
     else:
         make_dirs(os.path.dirname(path))
         os.mkdir(path)
-
-
 def upload_blob(bucket_name=os.environ.get("BUCKET_NAME", ""),
                 source_file_name=os.environ.get("AIRFLOW_HOME", ""),
-                destination_blob_name='folder_sync'):
+                destination_blob_name=DESTINATION_BLOB_NAME):
     """Uploads a file to the bucket."""
     storage_client = storage.Client()
     bucket = storage_client.get_bucket(bucket_name)
@@ -128,8 +134,9 @@ def upload_blob(bucket_name=os.environ.get("BUCKET_NAME", ""),
     blob.upload_from_filename(source_file_name)
 
 
-def download_blob_by_name(bucket_name=os.environ.get("BUCKET_NAME", ""), source_blob_name='folder_sync'):
+def download_blob_by_name(bucket_name=os.environ.get("BUCKET_NAME", ""), source_blob_name=DESTINATION_BLOB_NAME):
     """Uploads a file to the bucket."""
+    # TODO: Check here for source of downloading and for path where its saved
     storage_client = storage.Client()
     bucket = storage_client.get_bucket(bucket_name)
     blobs = bucket.list_blobs()
@@ -144,8 +151,9 @@ def download_blob_by_name(bucket_name=os.environ.get("BUCKET_NAME", ""), source_
 def walktree_to_upload(top=os.environ.get("AIRFLOW_HOME", ""), callback=upload_blob):
     """
     recursively descend the directory tree rooted at top,
-       calling the callback function for each regular file
+    calling the callback function for each regular file
     """
+    # TODO: contains some hardcoding in the path names. This is internal to the project folder
     if top.__contains__(".git") or top.__contains__("/logs/") or top.__contains__(".idea"):
         return
     for f in os.listdir(top):
@@ -158,7 +166,7 @@ def walktree_to_upload(top=os.environ.get("AIRFLOW_HOME", ""), callback=upload_b
             if f.endswith(".pyc") or f.endswith('.env'):  # or f.startswith(".idea"):
                 continue
             # It's a file, call the callback function
-            callback(os.environ.get("BUCKET_NAME", ""), pathname, 'folder_sync/' + pathname)
+            callback(os.environ.get("BUCKET_NAME", ""), pathname, DESTINATION_BLOB_NAME + pathname)
         else:
             # Unknown file type, print a message
             print('Skipping %s' % pathname)
@@ -198,11 +206,11 @@ def assign_files(instance_no, total_instances):
     return [blob for blob in req_blob[start:end]]
 
 
-def sync_folders(blob_name='folder_sync', *args, **kwargs):
+def sync_folders(blob_name=DESTINATION_BLOB_NAME):
     """
     To sync the folders with the cloud storage for the instances to pull
     """
-    sleep()
+    # sleep()
     storage_client = storage.Client()
     bucket = storage_client.get_bucket(os.environ.get("BUCKET_NAME", ""))
     blob_list = bucket.list_blobs()
@@ -234,6 +242,7 @@ def worker_task(instance_no, total_instances, logger=None, *args, **kwargs):
     arguments contains the various parameters that will
     be used by the machines to process the data like file numbers
     """
+    # TODO: A lot of path hardcoding
     dotenv.load_dotenv("./.worker_env")
     assigned_blobs = assign_files(instance_no=instance_no, total_instances=total_instances)
     logger.info('Blobs assigned: ' + str(assigned_blobs))
