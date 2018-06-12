@@ -23,11 +23,13 @@ def download_blob(bucket_name='central.rtheta.in', source_blob_name=DESTINATION_
         if blob.name.startswith(source_blob_name):
             rel_file_path = blob.name.replace(source_blob_name + '/', "")
             file_path = os.path.join(airflow_home, rel_file_path)
-            # make_dirs(os.path.dirname(file_path))  # for creating the path recursively
-            # blob.download_to_filename(file_path)
+            make_dirs(os.path.dirname(file_path))  # for creating the path recursively
+            blob.download_to_filename(file_path)
             print file_path
 
 
 if __name__ == "__main__":
 
+    # make_dirs(airflow_home)
     download_blob()
+    os.chdir(airflow_home)

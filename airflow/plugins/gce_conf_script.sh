@@ -7,10 +7,8 @@ apt-get update
 
 # based on https://serverfault.com/questions/362903/how-do-you-set-a-locale-non-interactively-on-debian-ubuntu
 # for setting up timezone otherwise all the instances will be scheduled for future in UTC configured instances
-AREA='Asia'
-ZONE='Kolkata'
-ZONEINFO_FILE='/usr/share/zoneinfo/'"${AREA}"'/'"${ZONE}"
-ln --force --symbolic "${ZONEINFO_FILE}" '/etc/localtime'
+ln --force --symbolic /usr/share/zoneinfo/Asia/Kolkata '/etc/localtime'
+
 dpkg-reconfigure --frontend=noninteractive tzdata
 
 
@@ -27,7 +25,9 @@ pip install python-dotenv
 pip install google-auth-httplib2
 pip install google-cloud
 
-export AIRFLOW_HOME='/home/rtheta/airflow'
+#export AIRFLOW_HOME='/home/rtheta/airflow'
+export AIRFLOW_HOME = "{AIRFLOW_HOME}"      # this will be filled from python
+#cd $AIRFLOW_HOME_PARENT
 
 # downloading data from buckets
 #wget https://storage.googleapis.com/central.rtheta.in/instance_blob_download.py
@@ -39,9 +39,10 @@ export C_FORCE_ROOT=true
 
 
 # change the directories to airflow home
-cd  /home/rtheta/airflow
+#cd  airflow
+#export AIRFLOW_HOME="`pwd`"
 
-export ENV="worker"     # sets env variable for worker. Used to identify server and worker dynamically
+#export ENV="worker"     # sets env variable for worker. Used to identify server and worker dynamically
 
 pip install airflow    # Required!! otherwise it gives some error =_=
 airflow worker

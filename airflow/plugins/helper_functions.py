@@ -15,6 +15,7 @@ os.environ['ZONE'] = "asia-south1-a"
 DESTINATION_BLOB_NAME = 'airflow_home'
 BINARY_FILE_BLOB_NAME = 'bin_log'
 PROCESSED_DATA_BLOB_NAME = 'json_log'
+CURRENT_WORKING_DIRECTORY = os.getcwd()
 
 
 def print_alias(*args):
@@ -53,7 +54,9 @@ def create_instance(compute, project, zone, name, bucket):
     # Configure the machine
     machine_type = "zones/%s/machineTypes/n1-standard-1" % zone
     # TODO: gce_conf_script path hardcoded
+    # TODO: do string formatting to include the airflow home path
     startup_script = open(os.path.join(os.path.dirname(__file__), 'gce_conf_script.sh'), 'r').read()
+    startup_script.format(AIRFLOW_HOME=CURRENT_WORKING_DIRECTORY)
     # image_url = "http://storage.googleapis.com/gce-demo-input/photo.jpg"
     # image_caption = "Ready for dessert?"
 
