@@ -67,7 +67,7 @@ def main(logger=None, filename='test.bin', save_filename=""):
             bb = create_string_buffer(bin_data[header_size:])
             packet = HeartBeatPayload()
             memmove(addressof(packet), addressof(bb), sizeof(packet))
-            print "Heartbeat {} sq:{}".format(header.msg_type, packet.last_seq_no)
+            # print "Heartbeat {} sq:{}".format(header.msg_type, packet.last_seq_no)
 
             heartbeat['msg_type'] = 'Z'
             heartbeat['last_seq_no'] = packet.last_seq_no
@@ -123,7 +123,7 @@ def main(logger=None, filename='test.bin', save_filename=""):
         bin_data = bin_data[header.msg_len:]
         arr.append(iter_data)
 
-        if counter % 1000 and bin_data and logger:
+        if counter % 1000 == 0 and bin_data and logger:
             print ("File: {}, count: {}".format(filename, counter))
 
     json.dump({

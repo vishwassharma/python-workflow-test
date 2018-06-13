@@ -26,7 +26,7 @@ pip install google-auth-httplib2
 pip install google-cloud
 
 #export AIRFLOW_HOME='/home/rtheta/airflow'
-export AIRFLOW_HOME = "{AIRFLOW_HOME}"      # this will be filled from python
+#export AIRFLOW_HOME = "{AIRFLOW_HOME}"      # this will be filled from python
 #cd $AIRFLOW_HOME_PARENT
 
 # downloading data from buckets

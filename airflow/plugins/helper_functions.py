@@ -13,9 +13,6 @@ os.environ['BUCKET_NAME'] = "central.rtheta.in"
 os.environ['ZONE'] = "asia-south1-a"
 
 DESTINATION_BLOB_NAME = 'airflow_home'
-BINARY_FILE_BLOB_NAME = 'bin_log'
-PROCESSED_DATA_BLOB_NAME = 'json_log'
-CURRENT_WORKING_DIRECTORY = os.getcwd()
 
 
 def print_alias(*args):
@@ -56,7 +53,12 @@ def create_instance(compute, project, zone, name, bucket):
     # TODO: gce_conf_script path hardcoded
     # TODO: do string formatting to include the airflow home path
     startup_script = open(os.path.join(os.path.dirname(__file__), 'gce_conf_script.sh'), 'r').read()
-    startup_script.format(AIRFLOW_HOME=CURRENT_WORKING_DIRECTORY)
+    temp_string = "#!/usr/bin/env bash\n" + "export AIRFLOW_HOME=" + os.getcwd() + '\n'
+    startup_script = temp_string + startup_script
+    startup_script.format(AIRFLOW_HOME=os.getcwd())
+    print "cwd: " + os.getcwd()
+    print "startup_script"
+    print startup_script
     # image_url = "http://storage.googleapis.com/gce-demo-input/photo.jpg"
     # image_caption = "Ready for dessert?"
 
@@ -202,7 +204,7 @@ def walktree_to_upload(top=os.environ.get("AIRFLOW_HOME", "/home/rtheta/airflow"
             print('Skipping %s' % pathname)
 
 
-def assign_files(instance_no, total_instances):
+def assign_files(instance_no, total_instances, bin_data_source_blob):
     """
     assigns files to the instances
     """
@@ -214,7 +216,7 @@ def assign_files(instance_no, total_instances):
 
     req_blob = []
     for blob in blob_list:
-        if blob.name.__contains__(BINARY_FILE_BLOB_NAME):
+        if blob.name.__contains__(bin_data_source_blob):
             req_blob.append(blob)
 
     q = len(req_blob) // total_instances
@@ -266,7 +268,7 @@ def setup_instances(instances):
         print("instance {} created".format(instance))
 
 
-def worker_task(instance_no, total_instances, logger=None, *args, **kwargs):
+def worker_task(instance_no, total_instances, bin_data_source_blob, logger=None):
     """
     get the task for the worker
     arguments contains the various parameters that will
@@ -281,16 +283,19 @@ def worker_task(instance_no, total_instances, logger=None, *args, **kwargs):
     dotenv.load_dotenv("./.worker_env")  # TODO: find a way around
 
     BIN_DATA_STORAGE = os.path.expanduser('~/raw_data')
+    PROCESSED_DATA_BLOB_NAME = "processed/" + bin_data_source_blob
     PROCESSED_DATA_STORAGE = os.path.expanduser('~/' + PROCESSED_DATA_BLOB_NAME)
 
-    assigned_blobs = assign_files(instance_no=instance_no, total_instances=total_instances)
+    assigned_blobs = assign_files(instance_no=instance_no,
+                                  total_instances=total_instances,
+                                  bin_data_source_blob=bin_data_source_blob)
     log_info("Instance_no: {}".format(instance_no))
     log_info('Blobs assigned: ' + str(assigned_blobs))
 
     # downloading the files
     file_names = []
     for blob in assigned_blobs:  # downloading bin files
-        rel_file_name = blob.name.replace(BINARY_FILE_BLOB_NAME + '/', '')
+        rel_file_name = blob.name.replace(bin_data_source_blob + '/', '')
         filename = os.path.join(BIN_DATA_STORAGE, rel_file_name)
         make_dirs(os.path.dirname(filename))
         blob.download_to_filename(filename)

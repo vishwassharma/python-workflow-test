@@ -22,8 +22,10 @@ class SyncOperator(BaseOperator):
         sync_folders()
         log.info("Sync complete...")
         log.info("Instance info received: " + str(self.operator_param['instance_info']))
+        log.info("bin_data_source_blob info received: " + str(self.operator_param['bin_data_source_blob']))
         task_instance = context['ti']
         task_instance.xcom_push(key='instance_info', value=self.operator_param['instance_info'])
+        task_instance.xcom_push(key='bin_data_source_blob', value=self.operator_param['bin_data_source_blob'])
 
 
 class SetupOperator(BaseOperator):
@@ -34,7 +36,8 @@ class SetupOperator(BaseOperator):
 
     def execute(self, context):
         log.info("setting up")
-        instance_info = context['ti'].xcom_pull(key='instance_info', task_ids='sync_task')
+        task_instance = context['ti']
+        instance_info = task_instance.xcom_pull(key='instance_info', task_ids='sync_task')
         log.info("Instance info received: " + str(instance_info))
         setup_instances(instances=instance_info['instances'])
         log.info("Instances created")
@@ -88,9 +91,11 @@ class WorkerOperator(BaseOperator):
         log.info("working")
         task_instance = context['ti']
         instance_info = task_instance.xcom_pull(key='instance_info', task_ids='sync_task')
+        bin_data_source_blob = task_instance.xcom_pull(key='bin_data_source_blob', task_ids='sync_task')
         log.info("Instances info received: " + str(instance_info))
         worker_task(logger=log, instance_no=self.operator_param['number'],
-                    total_instances=self.operator_param['total'])
+                    total_instances=self.operator_param['total'],
+                    bin_data_source_blob=bin_data_source_blob)
         log.info("dir(task_instance): " + str(dir(task_instance)))
         task_instance.xcom_push(key="work", value=True)
 

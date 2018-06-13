@@ -3,7 +3,7 @@ from google.cloud import storage
 
 DESTINATION_BLOB_NAME = 'airflow_home'
 
-airflow_home = os.environ.get('AIRFLOW_HOME', '/home/rtheta/airflow')
+airflow_home = os.environ['AIRFLOW_HOME']
 
 
 def make_dirs(path):
