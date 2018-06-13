@@ -56,9 +56,9 @@ def create_instance(compute, project, zone, name, bucket):
     temp_string = "#!/usr/bin/env bash\n" + "export AIRFLOW_HOME=" + os.getcwd() + '\n'
     startup_script = temp_string + startup_script
     startup_script.format(AIRFLOW_HOME=os.getcwd())
-    print "cwd: " + os.getcwd()
-    print "startup_script"
-    print startup_script
+    # print "cwd: " + os.getcwd()
+    # print "startup_script"
+    # print startup_script
     # image_url = "http://storage.googleapis.com/gce-demo-input/photo.jpg"
     # image_caption = "Ready for dessert?"
 

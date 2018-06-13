@@ -1,3 +1,4 @@
+import os
 import uuid
 import airflow
 from datetime import timedelta
@@ -14,27 +15,25 @@ from airflow.operators import (SyncOperator,
 
 # -------------------------------------------------------
 
-# getting input params from database
-# def user_inputs():
-"""
-Required document structure for user input:
-    {
-        "no_of_instances": <int>,
-        "bin_blob": <str> prefix of the root directory of bin files without trailing `/`
-    }
-"""
-# MONGO_HOST = '172.17.0.1/'
-MONGO_HOST = '127.0.0.1'
-client = MongoClient(host=MONGO_HOST)
-db = client['airflow_db']
-collection = db['user_inputs']
-user_input = list(collection.find())[-1]  # getting the last entry made by user
-NO_OF_INSTANCES = int(user_input.get('no_of_instances', 3))
-BIN_DATA_SOURCE_BLOB = str(user_input.get('bin_blob', 'bin_log'))
-# return {
-#     'no_of_instances': NO_OF_INSTANCES,
-#     'bin_data_source_blob': BIN_DATA_SOURCE_BLOB
-# }
+if os.environ.get('ENV') == "SERVER":
+    """
+    Required document structure for user input:
+        {
+            "no_of_instances": <int>,
+            "bin_blob": <str> prefix of the root directory of bin files without trailing `/`
+        }
+    """
+    # MONGO_HOST = '172.17.0.1/'
+    MONGO_HOST = '127.0.0.1'
+    client = MongoClient(host=MONGO_HOST)
+    db = client['airflow_db']
+    collection = db['user_inputs']
+    user_input = list(collection.find())[-1]  # getting the last entry made by user
+    NO_OF_INSTANCES = int(user_input.get('no_of_instances', 3))
+    BIN_DATA_SOURCE_BLOB = str(user_input.get('bin_blob', 'bin_log'))
+else:
+    NO_OF_INSTANCES = 3
+    BIN_DATA_SOURCE_BLOB = 'bin_log'
 
 # -------------------------------------------------------
 

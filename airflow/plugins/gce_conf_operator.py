@@ -93,6 +93,7 @@ class WorkerOperator(BaseOperator):
         instance_info = task_instance.xcom_pull(key='instance_info', task_ids='sync_task')
         bin_data_source_blob = task_instance.xcom_pull(key='bin_data_source_blob', task_ids='sync_task')
         log.info("Instances info received: " + str(instance_info))
+        log.info("bin_data_source_blob info received: " + str(self.operator_param['bin_data_source_blob']))
         worker_task(logger=log, instance_no=self.operator_param['number'],
                     total_instances=self.operator_param['total'],
                     bin_data_source_blob=bin_data_source_blob)

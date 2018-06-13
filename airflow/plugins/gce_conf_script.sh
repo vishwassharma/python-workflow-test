@@ -16,6 +16,7 @@ dpkg-reconfigure --frontend=noninteractive tzdata
 apt-get install python -y
 apt-get install python-pip -y
 pip install psycopg2-binary
+pip install pymongo
 pip install celery
 pip install airflow==1.8.0
 pip install airflow[celery]==1.8.0
