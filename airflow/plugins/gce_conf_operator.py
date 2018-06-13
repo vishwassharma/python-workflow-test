@@ -93,7 +93,7 @@ class WorkerOperator(BaseOperator):
         instance_info = task_instance.xcom_pull(key='instance_info', task_ids='sync_task')
         bin_data_source_blob = task_instance.xcom_pull(key='bin_data_source_blob', task_ids='sync_task')
         log.info("Instances info received: " + str(instance_info))
-        log.info("bin_data_source_blob info received: " + str(self.operator_param['bin_data_source_blob']))
+        log.info("bin_data_source_blob info received: " + str(bin_data_source_blob))
         worker_task(logger=log, instance_no=self.operator_param['number'],
                     total_instances=self.operator_param['total'],
                     bin_data_source_blob=bin_data_source_blob)
@@ -101,36 +101,66 @@ class WorkerOperator(BaseOperator):
         task_instance.xcom_push(key="work", value=True)
 
 
-class WorkerBlockSensorOperator(BaseSensorOperator):
+# class WorkerBlockSensorOperator(BaseSensorOperator):
+#     @apply_defaults
+#     def __init__(self, op_param, *args, **kwargs):
+#         self.operator_param = op_param
+#         super(WorkerBlockSensorOperator, self).__init__(*args, **kwargs)
+#
+#     def poke(self, context):
+#         task_instance = context['ti']
+#         block_status = task_instance.xcom_pull(key='complete', task_ids='blocking_task')
+#         log.info("parent worker blocking task complete: " + str(block_status))
+#         if block_status == True:
+#             time.sleep(5)
+#             return True
+#         return False
+
+
+class CompletionOperator(BlockSensorOperator):
     @apply_defaults
     def __init__(self, op_param, *args, **kwargs):
         self.operator_param = op_param
-        super(WorkerBlockSensorOperator, self).__init__(*args, **kwargs)
+        super(CompletionOperator, self).__init__(op_param=op_param, *args, **kwargs)
 
+        # def execute(self, context):
+        #     task_instance = context['ti']
+        #     instance_info = task_instance.xcom_pull(key='instance_info', task_ids='sync_task')
+        #     log.info("Instance info received: " + str(instance_info))
+        #     total_instance = len(instance_info['instances'])
+        #     count = 0
+        #     for i in range(total_instance):
+        #         work_status = task_instance.xcom_pull(key='work', task_ids='worker_task' + str(i))
+        #
+        #         # noinspection PySimplifyBooleanCheck
+        #         if work_status == True:
+        #             count += 1
+        #
+        #     log.info("count: " + str(count))
+        #     log.info("total_instance: " + str(total_instance))
+        #     if count == total_instance:
+        #         task_instance.xcom_push(key='complete', value=True)
+        #         return True
+        #     return False
+        #
+        #     # so that the workers complete their blocking task before termination and notifying the server
+        #     # time.sleep(30)
+        #     log.info("deleting instances")
+        #     instance_info = context['ti'].xcom_pull(key='instance_info', task_ids='sync_task')
+        #     log.info("Instance info received: " + str(instance_info))
+        #     delete_instances(instances=instance_info['instances'])
+        #     log.info("Instances deleted")
     def poke(self, context):
-        task_instance = context['ti']
-        block_status = task_instance.xcom_pull(key='complete', task_ids='blocking_task')
-        log.info("parent worker blocking task complete: " + str(block_status))
-        if block_status == True:
-            time.sleep(5)
-            return True
-        return False
+        result = super(CompletionOperator, self).poke(context)
 
+        if result:
+            log.info("deleting instances")
+            instance_info = context['ti'].xcom_pull(key='instance_info', task_ids='sync_task')
+            log.info("Instance info received: " + str(instance_info))
+            delete_instances(instances=instance_info['instances'])
+            log.info("Instances deleted")
 
-class CompletionOperator(BaseOperator):
-    @apply_defaults
-    def __init__(self, op_param, *args, **kwargs):
-        self.operator_param = op_param
-        super(CompletionOperator, self).__init__(*args, **kwargs)
-
-    def execute(self, context):
-        # so that the workers complete their blocking task before termination and notifying the server
-        time.sleep(30)
-        log.info("deleting instances")
-        instance_info = context['ti'].xcom_pull(key='instance_info', task_ids='sync_task')
-        log.info("Instance info received: " + str(instance_info))
-        delete_instances(instances=instance_info['instances'])
-        log.info("Instances deleted")
+        return result
 
 
 class GcePlugin(AirflowPlugin):
@@ -139,8 +169,8 @@ class GcePlugin(AirflowPlugin):
         SyncOperator,
         SetupOperator,
         SleepOperator,
-        BlockSensorOperator,
+        # BlockSensorOperator,
         WorkerOperator,
-        WorkerBlockSensorOperator,
+        # WorkerBlockSensorOperator,
         CompletionOperator
     ]

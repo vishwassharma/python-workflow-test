@@ -2,7 +2,6 @@ import os
 import time
 from stat import *
 
-import dotenv
 from google.cloud import storage
 from googleapiclient import discovery
 
@@ -16,7 +15,7 @@ DESTINATION_BLOB_NAME = 'airflow_home'
 
 
 def print_alias(*args):
-    print args
+    print(args)
 
 
 def wait_for_operation(compute, project, zone, operation):
@@ -39,6 +38,44 @@ def wait_for_operation(compute, project, zone, operation):
         time.sleep(1)
 
 
+def get_airflow_configs():
+    try:
+        # TODO: DATABASE Schema for configs
+        """
+        The configs should be in format:
+        {
+            "name": <CONFIG_NAME>,
+            "value": <value>
+        }
+        
+        example:
+        {
+            "name": "AIRFLOW_HOME",
+            "value": "/home/user/airflow"
+        }
+        """
+        from pymongo import MongoClient
+
+        MONGO_HOST = '172.17.0.1/'
+        # MONGO_HOST = '127.0.0.1'
+
+        client = MongoClient(host=MONGO_HOST)
+        db = client['airflow_db']
+        collection = db['configs']
+        configs = list(collection.find())
+        config_export_command = "export {name}={value}\n"
+
+        exported_configs = ""
+        for config in configs:
+            exported_configs = exported_configs + config_export_command.format(name=config.get('name'),
+                                                                               value=config.get('value'))
+    except Exception as e:
+        print(e)
+        exported_configs = ""
+
+    return exported_configs
+
+
 def create_instance(compute, project, zone, name, bucket):
     """
     Creates a compute instance on the google cloud platform
@@ -50,15 +87,14 @@ def create_instance(compute, project, zone, name, bucket):
 
     # Configure the machine
     machine_type = "zones/%s/machineTypes/n1-standard-1" % zone
-    # TODO: gce_conf_script path hardcoded
-    # TODO: do string formatting to include the airflow home path
     startup_script = open(os.path.join(os.path.dirname(__file__), 'gce_conf_script.sh'), 'r').read()
     temp_string = "#!/usr/bin/env bash\n" + "export AIRFLOW_HOME=" + os.getcwd() + '\n'
-    startup_script = temp_string + startup_script
+    overrided_configs = get_airflow_configs()
+    startup_script = temp_string + overrided_configs + startup_script
     startup_script.format(AIRFLOW_HOME=os.getcwd())
-    # print "cwd: " + os.getcwd()
-    # print "startup_script"
-    # print startup_script
+    # print ("cwd: " + os.getcwd())
+    # print ("startup_script")
+    # print (startup_script)
     # image_url = "http://storage.googleapis.com/gce-demo-input/photo.jpg"
     # image_caption = "Ready for dessert?"
 
@@ -177,7 +213,7 @@ def upload_blob(bucket_name=os.environ.get("BUCKET_NAME", ""),
 #             blob.download_to_filename(file_path)
 
 
-def walktree_to_upload(top=os.environ.get("AIRFLOW_HOME", "/home/rtheta/airflow"), callback=upload_blob):
+def walktree_to_upload(top=os.environ.get("AIRFLOW_HOME", os.getcwd()), callback=upload_blob):
     """
     recursively descend the directory tree rooted at top,
     calling the callback function for each regular file
@@ -280,8 +316,6 @@ def worker_task(instance_no, total_instances, bin_data_source_blob, logger=None)
     else:
         log_info = print_alias
 
-    dotenv.load_dotenv("./.worker_env")  # TODO: find a way around
-
     BIN_DATA_STORAGE = os.path.expanduser('~/raw_data')
     PROCESSED_DATA_BLOB_NAME = "processed/" + bin_data_source_blob
     PROCESSED_DATA_STORAGE = os.path.expanduser('~/' + PROCESSED_DATA_BLOB_NAME)
@@ -317,9 +351,9 @@ def worker_task(instance_no, total_instances, bin_data_source_blob, logger=None)
                     destination_blob_name=upload_name)
         upload_names.append(upload_name)
 
-        # print "file_names: {}".format(file_names)
-        # print "save_names: {}".format(save_names)
-        # print "upload_names: {}".format(upload_names)
+        # print ("file_names: {}".format(file_names))
+        # print ("save_names: {}".format(save_names))
+        # print ("upload_names: {}".format(upload_names))
 
 
 def delete_instances(instances):
@@ -337,11 +371,11 @@ def delete_instances(instances):
 
 # if __name__ == "__main__":
 #     # def pr(*args):
-#     #     print args
+#     #     print (args)
 #     #
 #     #
 #     # os.environ['AIRFLOW_HOME'] = "/home/rtheta/parser_pipeline/airflow"
-#     # print DESTINATION_BLOB_NAME
+#     # print (DESTINATION_BLOB_NAME)
 #     # walktree_to_upload("/home/rtheta/parser_pipeline/airflow", pr)
 #     # sync_folders()
 #

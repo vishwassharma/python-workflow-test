@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
 
+export ENV=WORKER
+
 # assuming root access
 sudo su
 apt-get update
@@ -17,6 +19,7 @@ apt-get install python -y
 apt-get install python-pip -y
 pip install psycopg2-binary
 pip install pymongo
+pip install redis
 pip install celery
 pip install airflow==1.8.0
 pip install airflow[celery]==1.8.0

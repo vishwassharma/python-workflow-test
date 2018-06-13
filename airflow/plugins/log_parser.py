@@ -117,13 +117,13 @@ def main(logger=None, filename='test.bin', save_filename=""):
             iter_data['quantity'] = packet.quantity
 
         else:
-            print header.msg_type
+            print (header.msg_type)
             # TODO: ask about dealing with 'Y' messages
 
         bin_data = bin_data[header.msg_len:]
         arr.append(iter_data)
 
-        if counter % 1000 == 0 and bin_data and logger:
+        if counter % 500 == 0 and bin_data and logger:
             print ("File: {}, count: {}".format(filename, counter))
 
     json.dump({

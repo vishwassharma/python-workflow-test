@@ -6,14 +6,18 @@ from pymongo import MongoClient
 from airflow.operators import (SyncOperator,
                                SetupOperator,
                                SleepOperator,
-                               BlockSensorOperator,
+                               # BlockSensorOperator,
                                WorkerOperator,
-                               WorkerBlockSensorOperator,
+                               # WorkerBlockSensorOperator,
                                CompletionOperator, )
 
 # TODO: add fetch input from mongoDB: http://172.17.0.1:27017/
 
 # -------------------------------------------------------
+
+os.environ['AIRFLOW_HOME'] = os.getcwd()
+os.environ['GOOGLE_APPLICATION_CREDENTIALS'] = "{}/dags/auth.ansible.json".format(os.getcwd())
+
 
 if os.environ.get('ENV') == "SERVER":
     """
@@ -23,8 +27,8 @@ if os.environ.get('ENV') == "SERVER":
             "bin_blob": <str> prefix of the root directory of bin files without trailing `/`
         }
     """
-    # MONGO_HOST = '172.17.0.1/'
-    MONGO_HOST = '127.0.0.1'
+    MONGO_HOST = '172.17.0.1/'
+    # MONGO_HOST = '127.0.0.1'
     client = MongoClient(host=MONGO_HOST)
     db = client['airflow_db']
     collection = db['user_inputs']
@@ -56,13 +60,14 @@ sync_task = SyncOperator(op_param={'instance_info': instance_info,
 setup_task = SetupOperator(op_param={},
                            task_id='setup_task', dag=dag)
 
-blocking_task = BlockSensorOperator(op_param={},
-                                    task_id='blocking_task', dag=dag)
+# blocking_task = BlockSensorOperator(op_param={},
+#                                     task_id='blocking_task', dag=dag)
 
 completion_task = CompletionOperator(op_param={},
-                                     task_id='completion_task1', dag=dag, retries=5)
+                                     task_id='completion_task', dag=dag, retries=5)
 
-sync_task >> setup_task >> blocking_task >> completion_task
+# sync_task >> setup_task >> blocking_task >> completion_task
+sync_task >> setup_task >> completion_task
 
 for instance_no in range(len(instance_info['instances'])):
     # sleep task is arranged in parallel to blocking_sensor to eliminate the changes of scheduling
@@ -71,9 +76,4 @@ for instance_no in range(len(instance_info['instances'])):
     sTask = SleepOperator(op_param={"sleep_time": 0}, task_id='sleep_task' + str(instance_no), dag=dag)
     wTask = WorkerOperator(op_param={"number": instance_no, "total": NO_OF_INSTANCES},
                            task_id='worker_task' + str(instance_no), dag=dag)
-
-    # This task is for halting the worker instances so that they may not take up the completion_task
-    # this will cause the task to fail
-    wbTask = WorkerBlockSensorOperator(op_param={}, task_id='block_task' + str(instance_no), dag=dag)
-
-    setup_task >> sTask >> wTask >> wbTask
+    setup_task >> sTask >> wTask

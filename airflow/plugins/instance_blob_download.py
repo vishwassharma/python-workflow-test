@@ -3,7 +3,7 @@ from google.cloud import storage
 
 DESTINATION_BLOB_NAME = 'airflow_home'
 
-airflow_home = os.environ['AIRFLOW_HOME']
+airflow_home = os.environ.get('AIRFLOW_HOME')
 
 
 def make_dirs(path):
@@ -25,7 +25,7 @@ def download_blob(bucket_name='central.rtheta.in', source_blob_name=DESTINATION_
             file_path = os.path.join(airflow_home, rel_file_path)
             make_dirs(os.path.dirname(file_path))  # for creating the path recursively
             blob.download_to_filename(file_path)
-            print file_path
+            print (file_path)
 
 
 if __name__ == "__main__":

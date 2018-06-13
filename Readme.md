@@ -52,7 +52,7 @@ Required changes:
 2. Find `sql_alchemy_conn` and replace its value with the PostgreSQL DB endpoint you obtained earlier
 3. Do the same for `celery_result_backend` i.e. set its value to the PostgreSQL DB endpoint
 4. Change the value of `broker_url` config to the RabbitMQ endpoint you already obtained.
-5. (Specific to the task we designed our system) Set the value of `celeryd_concurrency` to `1`.
+5. (Specific to the task we designed our system for) Set the value of `celeryd_concurrency` to `1`.
 This will help enable our workers to focus on a single task.
 
 ### Unleashing the beast
