@@ -1,3 +1,4 @@
+import os
 import time
 import logging
 
@@ -6,7 +7,8 @@ from airflow.plugins_manager import AirflowPlugin
 from airflow.utils.decorators import apply_defaults
 from airflow.operators.sensors import BaseSensorOperator
 
-from helper_functions import sync_folders, setup_instances, worker_task, delete_instances
+from helper_functions import unzip, sync_folders, setup_instances, worker_task, delete_instances, download_blob_by_name, \
+    walktree_to_upload
 
 log = logging.getLogger(__name__)
 
@@ -26,26 +28,83 @@ class SyncOperator(BaseOperator):
         task_instance = context['ti']
         task_instance.xcom_push(key='instance_info', value=self.operator_param['instance_info'])
         task_instance.xcom_push(key='bin_data_source_blob', value=self.operator_param['bin_data_source_blob'])
+        task_instance.xcom_push(key='zip_blob', value=self.operator_param['zip_blob'])
 
 
-class SetupOperator(BaseOperator):
+# class SetupOperator(BaseOperator):
+#     @apply_defaults
+#     def __init__(self, op_param, *args, **kwargs):
+#         self.operator_param = op_param
+#         super(SetupOperator, self).__init__(*args, **kwargs)
+#
+#     def execute(self, context):
+#         log.info("setting up")
+#         task_instance = context['ti']
+#         instance_info = task_instance.xcom_pull(key='instance_info', task_ids='sync_task')
+#         log.info("Instance info received: " + str(instance_info))
+#         setup_instances(instances=instance_info['instances'])
+#         log.info("Instances created")
+
+class SetupOperator(BaseSensorOperator):
     @apply_defaults
     def __init__(self, op_param, *args, **kwargs):
         self.operator_param = op_param
         super(SetupOperator, self).__init__(*args, **kwargs)
 
-    def execute(self, context):
-        log.info("setting up")
+    def poke(self, context):
+        """
+        creates an instance and pushes its id into xcom under 'created_instances` and returns False.
+        check if the unzip instance has returned its status to be true in xcom and then creates the
+        remaining instances.
+        """
         task_instance = context['ti']
         instance_info = task_instance.xcom_pull(key='instance_info', task_ids='sync_task')
-        log.info("Instance info received: " + str(instance_info))
-        setup_instances(instances=instance_info['instances'])
-        log.info("Instances created")
+        created_instances = task_instance.xcom_pull(key='created_instances', task_ids='setup_task')
+        unzip_status = task_instance.xcom_pull(key='status', task_ids='unzip_task')
+        if unzip_status == True:
+            create_instances = instance_info['instances']
+            for instance in created_instances:
+                if instance in create_instances:
+                    create_instances.remove(instance)
+            setup_instances(instances=create_instances)
+            task_instance.xcom_push(key='created_instances', value=instance_info['instances'])
+            return True
+        else:
+            create_instance = instance_info['instances'][0]
+            if create_instance in created_instances:
+                return False
+            setup_instances(instances=create_instance)
+            task_instance.xcom_push(key='created_instances', value=[create_instance])
+            return False
+
+
+class UnzipOperator(BaseOperator):
+    @apply_defaults
+    def __init__(self, op_param, *args, **kwargs):
+        self.operator_param = op_param
+        super(UnzipOperator, self).__init__(*args, **kwargs)
+
+    def execute(self, context):
+        task_instance = context['ti']
+        zip_blob = task_instance.xcom_pull(key='zip_blob', task_ids='sync_task')
+        log.info('zip_blob: {}'.format(zip_blob))
+        # Download the file in the instance and get its path.
+        # feed this path to the unzip function
+        # get path to unzipped folder and upload this folder
+        file_paths = download_blob_by_name(zip_blob, os.path.expanduser('~'))
+        unzipped_root = []
+        for path in file_paths:
+            # unzipping the files
+            unzipped_root.append(unzip(path))
+            walktree_to_upload()  # TODO: Make this upload faster using parallel uploads
+        task_instance.xcom_push(key='status', value=True)
 
 
 class SleepOperator(BaseOperator):
     @apply_defaults
-    def __init__(self, op_param, *args, **kwargs):
+    def __init__(self, op_param=None, *args, **kwargs):
+        if op_param is None:
+            op_param = {'sleep_time': 0}
         self.operator_param = op_param
         super(SleepOperator, self).__init__(*args, **kwargs)
 
@@ -150,6 +209,7 @@ class CompletionOperator(BlockSensorOperator):
         #     log.info("Instance info received: " + str(instance_info))
         #     delete_instances(instances=instance_info['instances'])
         #     log.info("Instances deleted")
+
     def poke(self, context):
         result = super(CompletionOperator, self).poke(context)
 

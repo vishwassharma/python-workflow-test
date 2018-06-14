@@ -18,6 +18,14 @@ def print_alias(*args):
     print(args)
 
 
+def unzip(path_to_zip):
+    import zipfile
+    zip_ref = zipfile.ZipFile(path_to_zip, 'r')
+    zip_ref.extractall(os.path.dirname(path_to_zip))
+    zip_ref.close()
+    return os.path.dirname(path_to_zip)
+
+
 def wait_for_operation(compute, project, zone, operation):
     """
     Waits for an Google cloud function to complete
@@ -198,19 +206,21 @@ def upload_blob(bucket_name=os.environ.get("BUCKET_NAME", ""),
     blob.upload_from_filename(source_file_name)
 
 
-# TODO: Not useful at the moment
-# def download_blob_by_name(bucket_name=os.environ.get("BUCKET_NAME", ""), source_blob_name=DESTINATION_BLOB_NAME):
-#     """Uploads a file to the bucket."""
-#     # TODO: Check here for source of downloading and for path where its saved
-#     storage_client = storage.Client()
-#     bucket = storage_client.get_bucket(bucket_name)
-#     blobs = bucket.list_blobs()
-#     for blob in blobs:
-#         if blob.name.startswith(source_blob_name):
-#             # download the blob (file in its folder)
-#             file_path = blob.name.replace(source_blob_name, "")
-#             make_dirs(os.path.dirname(file_path))  # for creating the path recursively
-#             blob.download_to_filename(file_path)
+def download_blob_by_name(source_blob_name, save_file_root="", bucket_name=os.environ.get("BUCKET_NAME", "central.rtheta.in")):
+    """Uploads a file to the bucket."""
+    storage_client = storage.Client()
+    bucket = storage_client.get_bucket(bucket_name)
+    blobs = bucket.list_blobs()
+    file_paths = []
+    for blob in blobs:
+        if blob.name.contains(source_blob_name):
+            file_name = blob.name.replace(source_blob_name, "")
+            valid_file_name = file_name if not file_name.startswith('/') else file_name[1:]
+            file_path = os.path.join(save_file_root, valid_file_name)
+            make_dirs(os.path.dirname(file_path))  # for creating the path recursively
+            blob.download_to_filename(file_path)
+            file_paths.append(file_path)
+    return file_paths
 
 
 def walktree_to_upload(top=os.environ.get("AIRFLOW_HOME", os.getcwd()), callback=upload_blob):
@@ -292,7 +302,8 @@ def setup_instances(instances):
     """
     will create instances, has to run on local/permanent machine
     """
-    sleep()
+    if not isinstance(instances, list):
+        instances = [instances]
     project = os.environ.get("PROJECT_NAME", "")
     bucket = os.environ.get("BUCKET_NAME", "")
     zone = os.environ.get("ZONE", "")

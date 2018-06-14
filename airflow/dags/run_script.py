@@ -6,18 +6,15 @@ from pymongo import MongoClient
 from airflow.operators import (SyncOperator,
                                SetupOperator,
                                SleepOperator,
-                               # BlockSensorOperator,
+    # BlockSensorOperator,
                                WorkerOperator,
-                               # WorkerBlockSensorOperator,
+    # WorkerBlockSensorOperator,
                                CompletionOperator, )
-
-# TODO: add fetch input from mongoDB: http://172.17.0.1:27017/
 
 # -------------------------------------------------------
 
 os.environ['AIRFLOW_HOME'] = os.getcwd()
 os.environ['GOOGLE_APPLICATION_CREDENTIALS'] = "{}/dags/auth.ansible.json".format(os.getcwd())
-
 
 if os.environ.get('ENV') == "SERVER":
     """
@@ -27,14 +24,15 @@ if os.environ.get('ENV') == "SERVER":
             "bin_blob": <str> prefix of the root directory of bin files without trailing `/`
         }
     """
-    MONGO_HOST = '172.17.0.1/'
-    # MONGO_HOST = '127.0.0.1'
+    # MONGO_HOST = '172.17.0.1/'
+    MONGO_HOST = '127.0.0.1'
     client = MongoClient(host=MONGO_HOST)
     db = client['airflow_db']
     collection = db['user_inputs']
     user_input = list(collection.find())[-1]  # getting the last entry made by user
     NO_OF_INSTANCES = int(user_input.get('no_of_instances', 3))
     BIN_DATA_SOURCE_BLOB = str(user_input.get('bin_blob', 'bin_log'))
+    ZIP_BLOB = str(user_input.get('zip_blob', 'zip_blob'))
 else:
     NO_OF_INSTANCES = 3
     BIN_DATA_SOURCE_BLOB = 'bin_log'
@@ -54,7 +52,8 @@ dag = airflow.DAG('process_dag', description='final running dag',
                   catchup=False, concurrency=20, default_args=def_args)
 
 sync_task = SyncOperator(op_param={'instance_info': instance_info,
-                                   'bin_data_source_blob': BIN_DATA_SOURCE_BLOB},
+                                   'bin_data_source_blob': BIN_DATA_SOURCE_BLOB,
+                                   'zip_blob': ZIP_BLOB},
                          task_id='sync_task', dag=dag)
 
 setup_task = SetupOperator(op_param={},
