@@ -18,6 +18,15 @@ def print_alias(*args):
     print(args)
 
 
+def get_joinable_rear_path(path):
+    """
+    Returns the path that can be used as the later part in os.path.join() function
+    :param path: original path
+    :return: path not starting with `/`
+    """
+    return path if not path.startswith('/') else get_joinable_rear_path(path[1:])
+
+
 def unzip(path_to_zip):
     import zipfile
     zip_ref = zipfile.ZipFile(path_to_zip, 'r')
@@ -196,17 +205,26 @@ def make_dirs(path):
         os.mkdir(path)
 
 
-def upload_blob(bucket_name=os.environ.get("BUCKET_NAME", ""),
-                source_file_name=os.environ.get("AIRFLOW_HOME", ""),
-                destination_blob_name=DESTINATION_BLOB_NAME):
-    """Uploads a file to the bucket."""
+def upload_blob(bucket_name, source_file_path, destination_blob_name=None,
+                tree_root=None, root_blob=None, *args, **kwargs):
+    """Uploads a file to the bucket"""
     storage_client = storage.Client()
     bucket = storage_client.get_bucket(bucket_name)
+    if destination_blob_name is None:
+        """ tree_root and root_blob should be present """
+        tree_root = os.path.abspath(tree_root)  # path that must be excluded from file name before uploading
+        # root_blob = kwargs['root_blob']  # the root blob where files must
+        file_path = os.path.abspath(source_file_path)
+        rel_file_path = file_path.replace(tree_root, "")  # file path relative to the tree_root
+        destination_blob_name = os.path.join(root_blob,
+                                             get_joinable_rear_path(rel_file_path))  # destination blob to upload file
+
     blob = bucket.blob(destination_blob_name)
-    blob.upload_from_filename(source_file_name)
+    blob.upload_from_filename(source_file_path)
 
 
-def download_blob_by_name(source_blob_name, save_file_root="", bucket_name=os.environ.get("BUCKET_NAME", "central.rtheta.in")):
+def download_blob_by_name(source_blob_name, save_file_root="",
+                          bucket_name=os.environ.get("BUCKET_NAME", "central.rtheta.in")):
     """Uploads a file to the bucket."""
     storage_client = storage.Client()
     bucket = storage_client.get_bucket(bucket_name)
@@ -223,28 +241,35 @@ def download_blob_by_name(source_blob_name, save_file_root="", bucket_name=os.en
     return file_paths
 
 
-def walktree_to_upload(top=os.environ.get("AIRFLOW_HOME", os.getcwd()), callback=upload_blob):
+# def walktree_to_upload(top=os.environ.get("AIRFLOW_HOME", os.getcwd()), callback=upload_blob):
+def walktree_to_upload(tree_root, cur_dir=None, callback=upload_blob, ignores=None, *args, **kwargs):
     """
     recursively descend the directory tree rooted at top,
     calling the callback function for each regular file
     """
-    # TODO: contains some hardcoding in the path names. This is internal to the project folder
-    if top.__contains__(".git") or top.__contains__("/logs/") or top.__contains__(".idea"):
-        return
-    for f in os.listdir(top):
-        pathname = os.path.join(top, f)
+    if not cur_dir:
+        cur_dir = tree_root
+    if ignores is not None:
+        for path in ignores:
+            if cur_dir.__contains__(path):
+                return
+    # if top.__contains__(".git") or top.__contains__("/logs/") or top.__contains__(".idea"):
+    #     return
+    for f in os.listdir(cur_dir):
+        pathname = os.path.join(cur_dir, f)
         mode = os.stat(pathname)[ST_MODE]
         if S_ISDIR(mode):
             # It's a directory, recurse into it
-            walktree_to_upload(pathname, callback)
+            walktree_to_upload(tree_root=tree_root, root=pathname, callback=callback, *args, **kwargs)
         elif S_ISREG(mode):
             if f.endswith(".pyc") or f.endswith('.env'):  # or f.startswith(".idea"):
                 continue
             # It's a file, call the callback function
-            file_blob_name = os.path.join(DESTINATION_BLOB_NAME,
-                                          pathname.replace(os.environ.get("AIRFLOW_HOME", "") + "/", ""))
+            # blob_name_rear = pathname.replace(absolute_root, "")
+            # file_blob_name = os.path.join(blob_name, get_joinable_rear_path(blob_name_rear))
             # The BLOB_NAME will act as the airflow home directory
-            callback(os.environ.get("BUCKET_NAME", ""), pathname, file_blob_name)
+            # callback(pathname, file_blob_name)
+            callback(tree_root=tree_root, cur_dir=cur_dir, source_file_path=pathname, *args, **kwargs)
         else:
             # Unknown file type, print a message
             print('Skipping %s' % pathname)

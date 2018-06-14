@@ -7,11 +7,17 @@ from airflow.plugins_manager import AirflowPlugin
 from airflow.utils.decorators import apply_defaults
 from airflow.operators.sensors import BaseSensorOperator
 
-from helper_functions import unzip, sync_folders, setup_instances, worker_task, delete_instances, download_blob_by_name, \
-    walktree_to_upload
+from taskers import xcom_pull, xcom_push, sync_folders, setup_instances, worker_task
+
+from helper_functions import unzip, \
+    delete_instances, download_blob_by_name, walktree_to_upload
+
+from constants import *
 
 log = logging.getLogger(__name__)
 
+
+# TODO: Make these make these functions pluggable for the purpose of testing using docker
 
 class SyncOperator(BaseOperator):
     @apply_defaults
@@ -20,19 +26,28 @@ class SyncOperator(BaseOperator):
         super(SyncOperator, self).__init__(*args, **kwargs)
 
     def execute(self, context):
+        params = self.self.operator_param
         log.info("Sync in progress...")
-        sync_folders()
+
+        # the program must be running in the airflow home thus, airflow_home = current working directory
+        ignores = ['.git', '/logs/', '.idea']
+        sync_folders(upload_blob_name=DESTINATION_BLOB_NAME,
+                     folder_root=os.getcwd(),
+                     bucket_name=BUCKET_NAME,
+                     ignores=ignores)
         log.info("Sync complete...")
-        log.info("Instance info received: " + str(self.operator_param['instance_info']))
-        log.info("bin_data_source_blob info received: " + str(self.operator_param['bin_data_source_blob']))
-        task_instance = context['ti']
-        task_instance.xcom_push(key='instance_info', value=self.operator_param['instance_info'])
-        task_instance.xcom_push(key='bin_data_source_blob', value=self.operator_param['bin_data_source_blob'])
-        task_instance.xcom_push(key='zip_blob', value=self.operator_param['zip_blob'])
+
+        data = {
+            "instance_info": params['instance_info'],
+            "bin_data_source_blob": params['bin_data_source_blob'],
+            "zip_blob": params['zip_blob'],
+        }
+        xcom_push(context, data)
+        log.info("xcom data pushed: {}".format(data))
 
 
 # class SetupOperator(BaseOperator):
-#     @apply_defaults
+# @apply_defaults
 #     def __init__(self, op_param, *args, **kwargs):
 #         self.operator_param = op_param
 #         super(SetupOperator, self).__init__(*args, **kwargs)
@@ -57,24 +72,31 @@ class SetupOperator(BaseSensorOperator):
         check if the unzip instance has returned its status to be true in xcom and then creates the
         remaining instances.
         """
-        task_instance = context['ti']
-        instance_info = task_instance.xcom_pull(key='instance_info', task_ids='sync_task')
-        created_instances = task_instance.xcom_pull(key='created_instances', task_ids='setup_task')
-        unzip_status = task_instance.xcom_pull(key='status', task_ids='unzip_task')
+        xcom_data = xcom_pull(context, {
+            'sync_task': 'instance_info',
+            'setup_task': 'created_instances',
+            'unzip_task': 'status'
+        })
+        instance_info = xcom_data['sync_task']['instance_info']
+        created_instances = xcom_data['setup_task']['created_instance'] or []
+        unzip_status = xcom_data['unzip_task']['status']
+        log.info("xcom data received: {}".format(xcom_data))
+
         if unzip_status == True:
             create_instances = instance_info['instances']
             for instance in created_instances:
                 if instance in create_instances:
                     create_instances.remove(instance)
             setup_instances(instances=create_instances)
-            task_instance.xcom_push(key='created_instances', value=instance_info['instances'])
+            xcom_push(context, {'created_instances': instance_info['instances']})
             return True
         else:
-            create_instance = instance_info['instances'][0]
-            if create_instance in created_instances:
+            if len(created_instances) >= 1:
+                # instance is already
                 return False
+            create_instance = instance_info['instances'][0]
             setup_instances(instances=create_instance)
-            task_instance.xcom_push(key='created_instances', value=[create_instance])
+            xcom_push(context, {'created_instances': [create_instance]})
             return False
 
 
@@ -85,19 +107,24 @@ class UnzipOperator(BaseOperator):
         super(UnzipOperator, self).__init__(*args, **kwargs)
 
     def execute(self, context):
-        task_instance = context['ti']
-        zip_blob = task_instance.xcom_pull(key='zip_blob', task_ids='sync_task')
-        log.info('zip_blob: {}'.format(zip_blob))
-        # Download the file in the instance and get its path.
-        # feed this path to the unzip function
-        # get path to unzipped folder and upload this folder
+        xcom_data = xcom_pull(context, {
+            'sync_task': ['instance_info', 'zip_blob', 'bin_data_source_blob'],
+            'setup_task': 'created_instances',
+            'unzip_task': 'status'
+        })
+        zip_blob = xcom_data['sync_task']['zip_blob']
+        bin_root_blob = xcom_data['sync_task']['bin_data_source_blob']
+        log.info('xcom data received: {}'.format(xcom_data))
+
         file_paths = download_blob_by_name(zip_blob, os.path.expanduser('~'))
         unzipped_root = []
         for path in file_paths:
             # unzipping the files
             unzipped_root.append(unzip(path))
-            walktree_to_upload()  # TODO: Make this upload faster using parallel uploads
-        task_instance.xcom_push(key='status', value=True)
+            walktree_to_upload(tree_root=path,
+                               root_blob=bin_root_blob)  # TODO: Make this upload faster using parallel uploads
+        xcom_push(context, {'status': True})
+        log.info("unzipping complete")
 
 
 class SleepOperator(BaseOperator):
@@ -120,22 +147,23 @@ class BlockSensorOperator(BaseSensorOperator):
         super(BlockSensorOperator, self).__init__(*args, **kwargs)
 
     def poke(self, context):
-        task_instance = context['ti']
-        instance_info = task_instance.xcom_pull(key='instance_info', task_ids='sync_task')
-        log.info("Instance info received: " + str(instance_info))
+        xcom_data = xcom_pull(context, {
+            'sync_task': ['instance_info'],  # 'zip_blob'],
+            # 'setup_task': 'created_instances',
+            # 'unzip_task': 'status'
+        })
+        instance_info = xcom_data['sync_task']['instance_info']
         total_instance = len(instance_info['instances'])
         count = 0
         for i in range(total_instance):
-            work_status = task_instance.xcom_pull(key='work', task_ids='worker_task' + str(i))
-
-            # noinspection PySimplifyBooleanCheck
+            task_id = 'worker_task' + str(i)
+            work_status = xcom_pull(context, {task_id: 'complete'})[task_id]['complete']
             if work_status == True:
                 count += 1
 
-        log.info("count: " + str(count))
-        log.info("total_instance: " + str(total_instance))
+        log.info("count: {}, total_instances: {} ".format(count, total_instance))
         if count == total_instance:
-            task_instance.xcom_push(key='complete', value=True)
+            xcom_push(context, {'status': True})
             return True
         return False
 
@@ -148,32 +176,16 @@ class WorkerOperator(BaseOperator):
 
     def execute(self, context):
         log.info("working")
-        task_instance = context['ti']
-        instance_info = task_instance.xcom_pull(key='instance_info', task_ids='sync_task')
-        bin_data_source_blob = task_instance.xcom_pull(key='bin_data_source_blob', task_ids='sync_task')
-        log.info("Instances info received: " + str(instance_info))
-        log.info("bin_data_source_blob info received: " + str(bin_data_source_blob))
-        worker_task(logger=log, instance_no=self.operator_param['number'],
+        xcom_data = xcom_pull(context, {
+            'sync_task': ['bin_data_source_blob']
+        })
+        bin_data_source_blob = xcom_data['sync_task']['bin_data_source_blob']
+        log.info("xcom_data: {}".format(xcom_data))
+
+        worker_task(instance_no=self.operator_param['number'],
                     total_instances=self.operator_param['total'],
                     bin_data_source_blob=bin_data_source_blob)
-        log.info("dir(task_instance): " + str(dir(task_instance)))
-        task_instance.xcom_push(key="work", value=True)
-
-
-# class WorkerBlockSensorOperator(BaseSensorOperator):
-#     @apply_defaults
-#     def __init__(self, op_param, *args, **kwargs):
-#         self.operator_param = op_param
-#         super(WorkerBlockSensorOperator, self).__init__(*args, **kwargs)
-#
-#     def poke(self, context):
-#         task_instance = context['ti']
-#         block_status = task_instance.xcom_pull(key='complete', task_ids='blocking_task')
-#         log.info("parent worker blocking task complete: " + str(block_status))
-#         if block_status == True:
-#             time.sleep(5)
-#             return True
-#         return False
+        xcom_push(context, {"status": True})
 
 
 class CompletionOperator(BlockSensorOperator):
@@ -198,7 +210,7 @@ class CompletionOperator(BlockSensorOperator):
         #     log.info("count: " + str(count))
         #     log.info("total_instance: " + str(total_instance))
         #     if count == total_instance:
-        #         task_instance.xcom_push(key='complete', value=True)
+        #         task_instance.xcom_push(key='status', value=True)
         #         return True
         #     return False
         #
@@ -215,11 +227,15 @@ class CompletionOperator(BlockSensorOperator):
 
         if result:
             log.info("deleting instances")
-            instance_info = context['ti'].xcom_pull(key='instance_info', task_ids='sync_task')
+            xcom_data = xcom_pull(context, {
+                'sync_task': 'instance_info',
+                'setup_task': 'created_instances',
+                'unzip_task': 'status'
+            })
+            instance_info = xcom_data['sync_task']['instance_info']
             log.info("Instance info received: " + str(instance_info))
             delete_instances(instances=instance_info['instances'])
             log.info("Instances deleted")
-
         return result
 
 
@@ -229,6 +245,7 @@ class GcePlugin(AirflowPlugin):
         SyncOperator,
         SetupOperator,
         SleepOperator,
+        UnzipOperator,
         # BlockSensorOperator,
         WorkerOperator,
         # WorkerBlockSensorOperator,
