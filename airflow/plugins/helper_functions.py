@@ -6,6 +6,7 @@ from google.cloud import storage
 from googleapiclient import discovery
 
 import log_parser
+from constants import *
 
 os.environ['PROJECT_NAME'] = "rtheta-central"
 os.environ['BUCKET_NAME'] = "central.rtheta.in"
@@ -27,12 +28,26 @@ def get_joinable_rear_path(path):
     return path if not path.startswith('/') else get_joinable_rear_path(path[1:])
 
 
-def unzip(path_to_zip):
-    import zipfile
-    zip_ref = zipfile.ZipFile(path_to_zip, 'r')
-    zip_ref.extractall(os.path.dirname(path_to_zip))
-    zip_ref.close()
-    return os.path.dirname(path_to_zip)
+def unzip(path_to_file):
+    extract_location = os.path.dirname(path_to_file)
+    if path_to_file.endswith("zip"):
+        import zipfile
+        zip_ref = zipfile.ZipFile(path_to_file, 'r')
+        zip_ref.extractall(extract_location)
+        zip_ref.close()
+    elif path_to_file.endswith('tar') or path_to_file.endswith('tar.gz'):
+        import tarfile
+        if path_to_file.endswith("tar.gz"):
+            tar = tarfile.open(path_to_file, "r:gz")
+            tar.extractall(extract_location)
+            tar.close()
+        elif path_to_file.endswith("tar"):
+            tar = tarfile.open(path_to_file, "r:")
+            tar.extractall(extract_location)
+            tar.close()
+    else:
+        raise Exception("Unknown file format")
+    return extract_location
 
 
 def wait_for_operation(compute, project, zone, operation):
@@ -70,11 +85,29 @@ def get_airflow_configs():
             "name": "AIRFLOW_HOME",
             "value": "/home/user/airflow"
         }
+        
+        {
+            application: 'airflow'
+            envs = [{
+                "name": "AIRFLOW_HOME",
+                "value": "/home/user/airflow"
+            }, {
+                "name": "AIRFLOW_LE",
+                "value": "3232"
+            }],
+            queues: {
+            
+                type: 'redis'
+                host: '',
+                port: '',
+                ..
+            }
+        }
         """
         from pymongo import MongoClient
 
-        MONGO_HOST = '172.17.0.1/'
-        # MONGO_HOST = '127.0.0.1'
+        # MONGO_HOST = '172.17.0.1/'
+        MONGO_HOST = '127.0.0.1'
 
         client = MongoClient(host=MONGO_HOST)
         db = client['airflow_db']
@@ -104,14 +137,17 @@ def create_instance(compute, project, zone, name, bucket):
 
     # Configure the machine
     machine_type = "zones/%s/machineTypes/n1-standard-1" % zone
+
     startup_script = open(os.path.join(os.path.dirname(__file__), 'gce_conf_script.sh'), 'r').read()
-    temp_string = "#!/usr/bin/env bash\n" + "export AIRFLOW_HOME=" + os.getcwd() + '\n'
+    become_superuser = "#!/usr/bin/env bash\n" + "sudo su\n"  # this is done here  because after changing the user, all the environment variables are gone
+    temp_string = "export AIRFLOW_HOME=" + os.getcwd() + '\n'
     overrided_configs = get_airflow_configs()
-    startup_script = temp_string + overrided_configs + startup_script
-    startup_script.format(AIRFLOW_HOME=os.getcwd())
-    # print ("cwd: " + os.getcwd())
-    # print ("startup_script")
-    # print (startup_script)
+    startup_script = become_superuser + temp_string + overrided_configs + startup_script
+
+    # startup_script.format(AIRFLOW_HOME=os.getcwd())
+    print ("cwd: " + os.getcwd())
+    print ("startup_script")
+    print (startup_script)
     # image_url = "http://storage.googleapis.com/gce-demo-input/photo.jpg"
     # image_caption = "Ready for dessert?"
 
@@ -205,7 +241,7 @@ def make_dirs(path):
         os.mkdir(path)
 
 
-def upload_blob(bucket_name, source_file_path, destination_blob_name=None,
+def upload_blob(source_file_path, destination_blob_name=None, bucket_name=BUCKET_NAME,
                 tree_root=None, root_blob=None, *args, **kwargs):
     """Uploads a file to the bucket"""
     storage_client = storage.Client()
@@ -223,17 +259,18 @@ def upload_blob(bucket_name, source_file_path, destination_blob_name=None,
     blob.upload_from_filename(source_file_path)
 
 
-def download_blob_by_name(source_blob_name, save_file_root="",
-                          bucket_name=os.environ.get("BUCKET_NAME", "central.rtheta.in")):
+def download_blob_by_name(source_blob_name, bucket_name, save_file_root=""):
     """Uploads a file to the bucket."""
     storage_client = storage.Client()
     bucket = storage_client.get_bucket(bucket_name)
     blobs = bucket.list_blobs()
     file_paths = []
     for blob in blobs:
-        if blob.name.contains(source_blob_name):
+        if blob.name.__contains__(source_blob_name):
             file_name = blob.name.replace(source_blob_name, "")
-            valid_file_name = file_name if not file_name.startswith('/') else file_name[1:]
+            valid_file_name = get_joinable_rear_path(file_name)
+            if valid_file_name == "":
+                continue
             file_path = os.path.join(save_file_root, valid_file_name)
             make_dirs(os.path.dirname(file_path))  # for creating the path recursively
             blob.download_to_filename(file_path)
@@ -260,7 +297,7 @@ def walktree_to_upload(tree_root, cur_dir=None, callback=upload_blob, ignores=No
         mode = os.stat(pathname)[ST_MODE]
         if S_ISDIR(mode):
             # It's a directory, recurse into it
-            walktree_to_upload(tree_root=tree_root, root=pathname, callback=callback, *args, **kwargs)
+            walktree_to_upload(tree_root=tree_root, cur_dir=pathname, callback=callback, *args, **kwargs)
         elif S_ISREG(mode):
             if f.endswith(".pyc") or f.endswith('.env'):  # or f.startswith(".idea"):
                 continue
@@ -269,7 +306,7 @@ def walktree_to_upload(tree_root, cur_dir=None, callback=upload_blob, ignores=No
             # file_blob_name = os.path.join(blob_name, get_joinable_rear_path(blob_name_rear))
             # The BLOB_NAME will act as the airflow home directory
             # callback(pathname, file_blob_name)
-            callback(tree_root=tree_root, cur_dir=cur_dir, source_file_path=pathname, *args, **kwargs)
+            callback(tree_root=tree_root, source_file_path=pathname, *args, **kwargs)
         else:
             # Unknown file type, print a message
             print('Skipping %s' % pathname)

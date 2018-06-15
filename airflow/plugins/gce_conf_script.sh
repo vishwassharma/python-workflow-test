@@ -3,7 +3,7 @@
 export ENV=WORKER
 
 # assuming root access
-sudo su
+#sudo su
 apt-get update
 
 
@@ -49,4 +49,5 @@ export C_FORCE_ROOT=true
 #export ENV="worker"     # sets env variable for worker. Used to identify server and worker dynamically
 
 pip install airflow    # Required!! otherwise it gives some error =_=
+cd $AIRFLOW_HOME
 airflow worker

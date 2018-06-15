@@ -26,7 +26,7 @@ class SyncOperator(BaseOperator):
         super(SyncOperator, self).__init__(*args, **kwargs)
 
     def execute(self, context):
-        params = self.self.operator_param
+        params = self.operator_param
         log.info("Sync in progress...")
 
         # the program must be running in the airflow home thus, airflow_home = current working directory
@@ -75,11 +75,13 @@ class SetupOperator(BaseSensorOperator):
         xcom_data = xcom_pull(context, {
             'sync_task': 'instance_info',
             'setup_task': 'created_instances',
-            'unzip_task': 'status'
+            'unzip_task': 'status',
+            'post_unzip_block_task': "started"
         })
         instance_info = xcom_data['sync_task']['instance_info']
-        created_instances = xcom_data['setup_task']['created_instance'] or []
+        created_instances = xcom_data['setup_task']['created_instances'] or []
         unzip_status = xcom_data['unzip_task']['status']
+        post_unzip_block_started = xcom_data['post_unzip_block_task']['started']
         log.info("xcom data received: {}".format(xcom_data))
 
         if unzip_status == True:
@@ -89,7 +91,9 @@ class SetupOperator(BaseSensorOperator):
                     create_instances.remove(instance)
             setup_instances(instances=create_instances)
             xcom_push(context, {'created_instances': instance_info['instances']})
-            return True
+            if post_unzip_block_started == True:
+                # return true if unzip is complete and the blocking of worker after unzipping has started
+                return True
         else:
             if len(created_instances) >= 1:
                 # instance is already
@@ -97,7 +101,8 @@ class SetupOperator(BaseSensorOperator):
             create_instance = instance_info['instances'][0]
             setup_instances(instances=create_instance)
             xcom_push(context, {'created_instances': [create_instance]})
-            return False
+
+        return False
 
 
 class UnzipOperator(BaseOperator):
@@ -116,13 +121,16 @@ class UnzipOperator(BaseOperator):
         bin_root_blob = xcom_data['sync_task']['bin_data_source_blob']
         log.info('xcom data received: {}'.format(xcom_data))
 
-        file_paths = download_blob_by_name(zip_blob, os.path.expanduser('~'))
-        unzipped_root = []
+        file_paths = download_blob_by_name(source_blob_name=zip_blob, bucket_name=BUCKET_NAME,
+                                           save_file_root=os.path.expanduser('~/zip_bin_log'))
+        unzip_roots = []
         for path in file_paths:
             # unzipping the files
-            unzipped_root.append(unzip(path))
-            walktree_to_upload(tree_root=path,
+            unzip_root = unzip(path)
+            os.remove(path)  # remove the file
+            walktree_to_upload(tree_root=unzip_root,
                                root_blob=bin_root_blob)  # TODO: Make this upload faster using parallel uploads
+            unzip_roots.append(unzip_root)
         xcom_push(context, {'status': True})
         log.info("unzipping complete")
 
@@ -147,23 +155,13 @@ class BlockSensorOperator(BaseSensorOperator):
         super(BlockSensorOperator, self).__init__(*args, **kwargs)
 
     def poke(self, context):
+        xcom_push(context, {"started": True})
         xcom_data = xcom_pull(context, {
-            'sync_task': ['instance_info'],  # 'zip_blob'],
-            # 'setup_task': 'created_instances',
-            # 'unzip_task': 'status'
+            'completion_task': ['started'],
         })
-        instance_info = xcom_data['sync_task']['instance_info']
-        total_instance = len(instance_info['instances'])
-        count = 0
-        for i in range(total_instance):
-            task_id = 'worker_task' + str(i)
-            work_status = xcom_pull(context, {task_id: 'complete'})[task_id]['complete']
-            if work_status == True:
-                count += 1
-
-        log.info("count: {}, total_instances: {} ".format(count, total_instance))
-        if count == total_instance:
-            xcom_push(context, {'status': True})
+        completion_start = xcom_data['completion_task']['started']
+        log.info("xcom_data: {}".format(xcom_data))
+        if completion_start == True:
             return True
         return False
 
@@ -188,11 +186,11 @@ class WorkerOperator(BaseOperator):
         xcom_push(context, {"status": True})
 
 
-class CompletionOperator(BlockSensorOperator):
+class CompletionOperator(BaseSensorOperator):
     @apply_defaults
     def __init__(self, op_param, *args, **kwargs):
         self.operator_param = op_param
-        super(CompletionOperator, self).__init__(op_param=op_param, *args, **kwargs)
+        super(CompletionOperator, self).__init__(*args, **kwargs)
 
         # def execute(self, context):
         #     task_instance = context['ti']
@@ -223,7 +221,28 @@ class CompletionOperator(BlockSensorOperator):
         #     log.info("Instances deleted")
 
     def poke(self, context):
-        result = super(CompletionOperator, self).poke(context)
+        xcom_push(context, {"started": True})
+        # result = super(CompletionOperator, self).poke(context)
+        xcom_data = xcom_pull(context, {
+            'sync_task': ['instance_info'],  # 'zip_blob'],
+            # 'setup_task': 'created_instances',
+            # 'unzip_task': 'status'
+        })
+        instance_info = xcom_data['sync_task']['instance_info']
+        total_instance = len(instance_info['instances'])
+        count = 0
+        for i in range(total_instance):
+            task_id = 'worker_task' + str(i)
+            work_status = xcom_pull(context, {task_id: 'complete'})[task_id]['complete']
+            if work_status == True:
+                count += 1
+
+        log.info("count: {}, total_instances: {} ".format(count, total_instance))
+        if count == total_instance:
+            xcom_push(context, {'status': True})
+            result = True
+        else:
+            result = False
 
         if result:
             log.info("deleting instances")
@@ -246,7 +265,7 @@ class GcePlugin(AirflowPlugin):
         SetupOperator,
         SleepOperator,
         UnzipOperator,
-        # BlockSensorOperator,
+        BlockSensorOperator,
         WorkerOperator,
         # WorkerBlockSensorOperator,
         CompletionOperator

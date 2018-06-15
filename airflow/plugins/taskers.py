@@ -45,7 +45,7 @@ def xcom_pull(context, params):
     """
     data = {}
     task_instance = context['ti']
-    task_instance.xcom_pull(key='instance_info', task_ids='sync_task')
+    # task_instance.xcom_pull(key='instance_info', task_ids='sync_task')
     for task_id in params.keys():
         data[task_id] = {}
         keys = params[task_id] if isinstance(params[task_id], (list, tuple)) else [params[task_id]]
@@ -66,7 +66,7 @@ def sync_folders(upload_blob_name, folder_root, bucket_name, ignores=None):
         if blob.name.__contains__(upload_blob_name):
             bucket.delete_blob(blob.name)
     walktree_to_upload(tree_root=folder_root, ignores=ignores,
-                       bucket_name=bucket_name, rooot_blob=upload_blob_name)
+                       bucket_name=bucket_name, root_blob=upload_blob_name)
 
 
 def setup_instances(instances):
