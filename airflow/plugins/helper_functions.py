@@ -70,22 +70,21 @@ def wait_for_operation(compute, project, zone, operation):
         time.sleep(1)
 
 
+def parse_configs_to_command(config_list):
+    config_export_command = "export {name}={value}\n"
+
+    parsed_configs = ""
+    for config in config_list:
+        parsed_configs = parsed_configs + config_export_command.format(name=config.get('name'),
+                                                                       value=config.get('value'))
+    return parsed_configs
+
+
 def get_airflow_configs():
     try:
         # TODO: DATABASE Schema for configs
         """
         The configs should be in format:
-        {
-            "name": <CONFIG_NAME>,
-            "value": <value>
-        }
-        
-        example:
-        {
-            "name": "AIRFLOW_HOME",
-            "value": "/home/user/airflow"
-        }
-        
         {
             application: 'airflow'
             envs = [{
@@ -101,24 +100,34 @@ def get_airflow_configs():
                 host: '',
                 port: '',
                 ..
+            },
+            inputs = {
+                    "NO_OF_INSTANCES": <int>,
+                    "BIN_DATA_SOURCE_BLOB": <str> root blob name for the binary files
+                    "ZIP_BLOB": <str> prefix of the root directory of bin files without trailing `/`
             }
         }
         """
         from pymongo import MongoClient
 
-        # MONGO_HOST = '172.17.0.1/'
-        MONGO_HOST = '127.0.0.1'
+        MONGO_HOST = '172.17.0.1/'
+        # MONGO_HOST = '127.0.0.1'
 
         client = MongoClient(host=MONGO_HOST)
+        # db = client['airflow_db']
+        # collection = db['settings']
+        # configs = list(collection.find())[-1].get('envs', [])
+        # config_export_command = "export {name}={value}\n"
+        #
+        # exported_configs = ""
+        # for config in configs:
+        #     exported_configs = exported_configs + config_export_command.format(name=config.get('name'),
+        #                                                                        value=config.get('value'))
         db = client['airflow_db']
-        collection = db['configs']
-        configs = list(collection.find())
-        config_export_command = "export {name}={value}\n"
-
-        exported_configs = ""
-        for config in configs:
-            exported_configs = exported_configs + config_export_command.format(name=config.get('name'),
-                                                                               value=config.get('value'))
+        collection = db['settings']
+        latest_document = list(collection.find())[-1]
+        configs = latest_document['envs']
+        exported_configs = parse_configs_to_command(config_list=configs)
     except Exception as e:
         print(e)
         exported_configs = ""
@@ -126,7 +135,7 @@ def get_airflow_configs():
     return exported_configs
 
 
-def create_instance(compute, project, zone, name, bucket):
+def create_instance(compute, project, zone, name, bucket, export_configs):
     """
     Creates a compute instance on the google cloud platform
     """
@@ -140,9 +149,11 @@ def create_instance(compute, project, zone, name, bucket):
 
     startup_script = open(os.path.join(os.path.dirname(__file__), 'gce_conf_script.sh'), 'r').read()
     become_superuser = "#!/usr/bin/env bash\n" + "sudo su\n"  # this is done here  because after changing the user, all the environment variables are gone
+    exported_configs = parse_configs_to_command(export_configs)
     temp_string = "export AIRFLOW_HOME=" + os.getcwd() + '\n'
     overrided_configs = get_airflow_configs()
-    startup_script = become_superuser + temp_string + overrided_configs + startup_script
+
+    startup_script = become_superuser + exported_configs + temp_string + overrided_configs + startup_script
 
     # startup_script.format(AIRFLOW_HOME=os.getcwd())
     print ("cwd: " + os.getcwd())
@@ -324,7 +335,7 @@ def assign_files(instance_no, total_instances, bin_data_source_blob):
 
     req_blob = []
     for blob in blob_list:
-        if blob.name.__contains__(bin_data_source_blob):
+        if blob.name.startswith(bin_data_source_blob):
             req_blob.append(blob)
 
     q = len(req_blob) // total_instances

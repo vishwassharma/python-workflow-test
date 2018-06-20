@@ -9,3 +9,4 @@ auth.ansible.json
 *airflow-webserver.pid
 airflow/.worker_env
 bin_files
+.dbs

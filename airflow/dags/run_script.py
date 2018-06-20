@@ -32,23 +32,29 @@ try:
         }
     """
     # MONGO_HOST = '127.0.0.1'
-    # MONGO_HOST = '172.17.0.1/'
-    # client = MongoClient(host=MONGO_HOST)
+    MONGO_HOST = '172.17.0.1/'
+    client = MongoClient(host=MONGO_HOST)
 
-    client = MongoClient()
+    # client = MongoClient()
 
     db = client['airflow_db']
-    collection = db['user_inputs']
-    user_input = list(collection.find())[-1]  # getting the last entry made by user
-    NO_OF_INSTANCES = int(user_input.get('NO_OF_INSTANCES', 3)) or 1  # no of instances should be at least 1
-    BIN_DATA_SOURCE_BLOB = str(user_input.get('BIN_DATA_SOURCE_BLOB', 'bin_log'))
-    ZIP_BLOB = str(user_input.get('ZIP_BLOB', 'zip_blob'))
+    collection = db['settings']
+    latest_document = list(collection.find())[-1]
+    user_inputs = latest_document['user_inputs']
+    NO_OF_INSTANCES = int(user_inputs.get('NO_OF_INSTANCES', 3)) or 1  # no of instances should be at least 1
+    BIN_DATA_SOURCE_BLOB = str(user_inputs.get('BIN_DATA_SOURCE_BLOB', 'bin_log'))
+    ZIP_BLOB = str(user_inputs.get('ZIP_BLOB', 'zip_blob'))
     log.info("Fetched info from database")
 except Exception as e:
     log.info("Exception occurred: {}".format(e))
-    NO_OF_INSTANCES = 3
-    BIN_DATA_SOURCE_BLOB = 'bin_log'
-    ZIP_BLOB = 'zip_blob'
+    if os.environ.get('ENV') == "WORKER":
+        NO_OF_INSTANCES = int(os.environ.get('NO_OF_INSTANCES', 3))
+        BIN_DATA_SOURCE_BLOB = os.environ.get('BIN_DATA_SOURCE_BLOB', 'bin_log')
+        ZIP_BLOB = os.environ.get('ZIP_BLOB', 'zip_blob')
+    else:
+        NO_OF_INSTANCES = 3
+        BIN_DATA_SOURCE_BLOB = 'bin_log'
+        ZIP_BLOB = 'zip_blob'
 
 # -------------------------------------------------------
 
@@ -69,16 +75,16 @@ sync_task = SyncOperator(op_param={'instance_info': instance_info,
                                    'zip_blob': ZIP_BLOB},
                          task_id='sync_task', dag=dag)
 
-setup_task = SetupOperator(op_param={},
+setup_task = SetupOperator(op_param={"task_id": "setup_task"},
                            task_id='setup_task', dag=dag)
 
-unzip_task = UnzipOperator(op_param={},
+unzip_task = UnzipOperator(op_param={"task_id": "unzip_task"},
                            task_id='unzip_task', dag=dag)
 
-completion_task = CompletionOperator(op_param={},
+completion_task = CompletionOperator(op_param={"task_id": "completion_task"},
                                      task_id='completion_task', dag=dag, retries=5)
 sleep_task = SleepOperator(op_param={"sleep_time": 0}, task_id='sleep_task', dag=dag)
-block_after_unzip = BlockSensorOperator(op_param={}, task_id='post_unzip_block_task', dag=dag)
+block_after_unzip = BlockSensorOperator(op_param={"task_id": "block_after_unzip_task"}, task_id='post_unzip_block_task', dag=dag)
 
 sync_task >> setup_task >> completion_task
 sync_task >> sleep_task >> unzip_task >> block_after_unzip

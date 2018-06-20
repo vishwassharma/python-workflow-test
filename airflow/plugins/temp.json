@@ -1,0 +1,14 @@
+{
+  "application": "airflow",
+  "envs": [
+    {
+      "name": "AIRFLOW__CORE__BASE_LOG_FOLDER",
+      "value": "~/logs"
+    }
+  ],
+  "user_inputs": {
+    "NO_OF_INSTANCES": 2,
+    "BIN_DATA_SOURCE_BLOB": "bin_log2",
+    "ZIP_BLOB": "zip_blob_2"
+  }
+}

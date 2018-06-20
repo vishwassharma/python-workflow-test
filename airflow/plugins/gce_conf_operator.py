@@ -46,20 +46,6 @@ class SyncOperator(BaseOperator):
         log.info("xcom data pushed: {}".format(data))
 
 
-# class SetupOperator(BaseOperator):
-# @apply_defaults
-#     def __init__(self, op_param, *args, **kwargs):
-#         self.operator_param = op_param
-#         super(SetupOperator, self).__init__(*args, **kwargs)
-#
-#     def execute(self, context):
-#         log.info("setting up")
-#         task_instance = context['ti']
-#         instance_info = task_instance.xcom_pull(key='instance_info', task_ids='sync_task')
-#         log.info("Instance info received: " + str(instance_info))
-#         setup_instances(instances=instance_info['instances'])
-#         log.info("Instances created")
-
 class SetupOperator(BaseSensorOperator):
     @apply_defaults
     def __init__(self, op_param, *args, **kwargs):
@@ -73,24 +59,41 @@ class SetupOperator(BaseSensorOperator):
         remaining instances.
         """
         xcom_data = xcom_pull(context, {
-            'sync_task': 'instance_info',
+            'sync_task': ['instance_info', 'bin_data_source_blob', 'zip_blob'],
             'setup_task': 'created_instances',
             'unzip_task': 'status',
             'post_unzip_block_task': "started"
         })
         instance_info = xcom_data['sync_task']['instance_info']
+        bin_data_source_blob = xcom_data['sync_task']['bin_data_source_blob']
+        zip_blob = xcom_data['sync_task']['zip_blob']
         created_instances = xcom_data['setup_task']['created_instances'] or []
         unzip_status = xcom_data['unzip_task']['status']
         post_unzip_block_started = xcom_data['post_unzip_block_task']['started']
         log.info("xcom data received: {}".format(xcom_data))
+
+        EXPORT_ENV_CONFIG_WORKER = [
+            {
+                "name": "NO_OF_INSTANCES",
+                "value": len(instance_info['instances'])
+            },
+            {
+                "name": "BIN_DATA_SOURCE_BLOB",
+                "value": bin_data_source_blob
+            },
+            {
+                "name": "ZIP_BLOB",
+                "value": zip_blob
+            }
+        ]
 
         if unzip_status == True:
             create_instances = instance_info['instances']
             for instance in created_instances:
                 if instance in create_instances:
                     create_instances.remove(instance)
-            setup_instances(instances=create_instances)
-            xcom_push(context, {'created_instances': instance_info['instances']})
+            setup_instances(instances=create_instances, export_configs=EXPORT_ENV_CONFIG_WORKER)
+            xcom_push(context, {'created_instances': created_instances + create_instances})
             if post_unzip_block_started == True:
                 # return true if unzip is complete and the blocking of worker after unzipping has started
                 return True
@@ -99,7 +102,7 @@ class SetupOperator(BaseSensorOperator):
                 # instance is already
                 return False
             create_instance = instance_info['instances'][0]
-            setup_instances(instances=create_instance)
+            setup_instances(instances=create_instance, export_configs=EXPORT_ENV_CONFIG_WORKER)
             xcom_push(context, {'created_instances': [create_instance]})
 
         return False
@@ -233,7 +236,7 @@ class CompletionOperator(BaseSensorOperator):
         count = 0
         for i in range(total_instance):
             task_id = 'worker_task' + str(i)
-            work_status = xcom_pull(context, {task_id: 'complete'})[task_id]['complete']
+            work_status = xcom_pull(context, {task_id: 'status'})[task_id]['status']
             if work_status == True:
                 count += 1
 

@@ -82,6 +82,7 @@ def main(logger=None, filename='test.bin', save_filename=""):
             iter_data['order_type'] = packet.order_type
             iter_data['price'] = packet.price
             iter_data['quantity'] = packet.quantity
+            iter_data['timestamp'] = packet.timestamp
 
         elif header.msg_type == 'T':
             # print "Received Trade Message"
@@ -93,6 +94,7 @@ def main(logger=None, filename='test.bin', save_filename=""):
             iter_data['token'] = packet.token
             iter_data['price'] = packet.price
             iter_data['quantity'] = packet.quantity
+            iter_data['timestamp'] = packet.timestamp
 
         elif header.msg_type == 'G' or header.msg_type == 'H' or header.msg_type == 'J':
             # print "Received Spread Order Message"
@@ -104,6 +106,7 @@ def main(logger=None, filename='test.bin', save_filename=""):
             iter_data['order_type'] = packet.order_type
             iter_data['price'] = packet.price
             iter_data['quantity'] = packet.quantity
+            iter_data['timestamp'] = packet.timestamp
 
         elif header.msg_type == 'K':
             # print "Received Spread Trade Message"
@@ -115,9 +118,11 @@ def main(logger=None, filename='test.bin', save_filename=""):
             iter_data['token'] = packet.token
             iter_data['price'] = packet.price
             iter_data['quantity'] = packet.quantity
+            iter_data['timestamp'] = packet.timestamp
 
         else:
-            print (header.msg_type)
+            # print (header.msg_type)
+            pass
             # TODO: ask about dealing with 'Y' messages
 
         bin_data = bin_data[header.msg_len:]

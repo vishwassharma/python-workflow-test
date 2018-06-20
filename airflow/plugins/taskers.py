@@ -69,7 +69,7 @@ def sync_folders(upload_blob_name, folder_root, bucket_name, ignores=None):
                        bucket_name=bucket_name, root_blob=upload_blob_name)
 
 
-def setup_instances(instances):
+def setup_instances(instances, export_configs):
     """
     will create instances, has to run on local/permanent machine
     """
@@ -81,7 +81,7 @@ def setup_instances(instances):
     compute = discovery.build('compute', 'v1')
     for instance in instances:
         log.info('Creating instance.')
-        operation = create_instance(compute, project, zone, instance, bucket)
+        operation = create_instance(compute, project, zone, instance, bucket, export_configs)
         wait_for_operation(compute, project, zone, operation['name'])
         log.info("instance {} created".format(instance))
 
@@ -138,9 +138,9 @@ def worker_task(instance_no, total_instances, bin_data_source_blob):
                     destination_blob_name=upload_name, bucket_name=BUCKET_NAME)
         upload_names.append(upload_name)
 
-        # print ("file_names: {}".format(file_names))
-        # print ("save_names: {}".format(save_names))
-        # print ("upload_names: {}".format(upload_names))
+    print ("file_names: {}".format(file_names))
+    print ("save_names: {}".format(save_names))
+    print ("upload_names: {}".format(upload_names))
 
 
 def delete_instances(instances):
