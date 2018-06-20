@@ -75,3 +75,14 @@ and terminate them after they complete their work and save the result on the clo
 This project itself includes all the required processes, functions and the shell scripts
 required to setup those worker instances, assign work to them and then terminate them.
 
+
+
+### Update:
+
+-> Added airflow docker for easy deployment
+
+
+### TODO:
+
+-> To add correct configs for redis
+-> add configs to mongodb every time after rebuilding the mongo server
