@@ -75,8 +75,14 @@ def parse_configs_to_command(config_list):
 
     parsed_configs = ""
     for config in config_list:
-        parsed_configs = parsed_configs + config_export_command.format(name=config.get('name'),
-                                                                       value=config.get('value'))
+        value = config.get('value')
+        if 'type' in config:
+            if config['type'] == 'int':
+                # command = config_export_command.format(name=config.get('name'), value=int(config.get('value')))
+                value = int(value)
+        # else:
+        command = config_export_command.format(name=config.get('name'), value=value)
+        parsed_configs = parsed_configs + command
     return parsed_configs
 
 
@@ -90,9 +96,11 @@ def get_airflow_configs():
             envs = [{
                 "name": "AIRFLOW_HOME",
                 "value": "/home/user/airflow"
+                "type": <"int" or "str">
             }, {
                 "name": "AIRFLOW_LE",
-                "value": "3232"
+                "value": 3232,
+                "type": "int"
             }],
             queues: {
             
@@ -110,7 +118,7 @@ def get_airflow_configs():
         """
         from pymongo import MongoClient
 
-        MONGO_HOST = '172.17.0.1/'
+        MONGO_HOST = '172.17.0.1'
         # MONGO_HOST = '127.0.0.1'
 
         client = MongoClient(host=MONGO_HOST)

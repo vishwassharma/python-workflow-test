@@ -32,7 +32,7 @@ try:
         }
     """
     # MONGO_HOST = '127.0.0.1'
-    MONGO_HOST = '172.17.0.1/'
+    MONGO_HOST = '172.17.0.1'
     client = MongoClient(host=MONGO_HOST)
 
     # client = MongoClient()
