@@ -43,20 +43,28 @@ class StreamHeader(LittleEndianStructure):
     ]
 
 
-def main(logger=None, filename='test.bin', save_filename=""):
+def main(logger=None, filename='test.bin', save_filename=''):
     heartbeat = {}  # TODO: ask about the frequency of heartbeat message and its usage
     arr = []
     counter = 0
     infile = open(filename, 'rb')
-    bin_data = infile.read()
+    file_data = infile.read()
     header = StreamHeader()
     header_size = sizeof(StreamHeader)
+
     # import pdb; pdb.set_trace()
+
+    BIN_BUFFER_SIZE = 50000
+    bin_data = file_data[:BIN_BUFFER_SIZE]
+    file_data = file_data[BIN_BUFFER_SIZE:]
+
     while bin_data:
         counter += 1
         iter_data = {}
+
         # Abuse ctypes to initialize from a string
-        bb = create_string_buffer(bin_data)
+        temp_bin = bin_data[:60]
+        bb = create_string_buffer(temp_bin)
         memmove(addressof(header), addressof(bb), header_size)
 
         iter_data['msg_type'] = header.msg_type
@@ -64,7 +72,7 @@ def main(logger=None, filename='test.bin', save_filename=""):
 
         if header.msg_type == 'Z':
             # print "Received HeartBeat Message"
-            bb = create_string_buffer(bin_data[header_size:])
+            bb = create_string_buffer(temp_bin[header_size:])
             packet = HeartBeatPayload()
             memmove(addressof(packet), addressof(bb), sizeof(packet))
             # print "Heartbeat {} sq:{}".format(header.msg_type, packet.last_seq_no)
@@ -74,7 +82,8 @@ def main(logger=None, filename='test.bin', save_filename=""):
 
         elif header.msg_type == 'N' or header.msg_type == 'X' or header.msg_type == 'M':
             # print "Received Order Message"
-            bb = create_string_buffer(bin_data[header_size:])
+            # bb = create_string_buffer(bin_data[header_size:])
+            bb = create_string_buffer(temp_bin[header_size:])
             packet = OrderPayload()
             memmove(addressof(packet), addressof(bb), sizeof(packet))
             iter_data['order_id'] = packet.order_id
@@ -86,7 +95,8 @@ def main(logger=None, filename='test.bin', save_filename=""):
 
         elif header.msg_type == 'T':
             # print "Received Trade Message"
-            bb = create_string_buffer(bin_data[header_size:])
+            # bb = create_string_buffer(bin_data[header_size:])
+            bb = create_string_buffer(temp_bin[header_size:])
             packet = TradePayload()
             memmove(addressof(packet), addressof(bb), sizeof(packet))
             iter_data['buy_order_id'] = packet.buy_order_id
@@ -98,7 +108,8 @@ def main(logger=None, filename='test.bin', save_filename=""):
 
         elif header.msg_type == 'G' or header.msg_type == 'H' or header.msg_type == 'J':
             # print "Received Spread Order Message"
-            bb = create_string_buffer(bin_data[header_size:])
+            # bb = create_string_buffer(bin_data[header_size:])
+            bb = create_string_buffer(temp_bin[header_size:])
             packet = OrderPayload()
             memmove(addressof(packet), addressof(bb), sizeof(packet))
             iter_data['order_id'] = packet.order_id
@@ -110,7 +121,8 @@ def main(logger=None, filename='test.bin', save_filename=""):
 
         elif header.msg_type == 'K':
             # print "Received Spread Trade Message"
-            bb = create_string_buffer(bin_data[header_size:])
+            # bb = create_string_buffer(bin_data[header_size:])
+            bb = create_string_buffer(temp_bin[header_size:])
             packet = TradePayload()
             memmove(addressof(packet), addressof(bb), sizeof(packet))
             iter_data['buy_order_id'] = packet.buy_order_id
@@ -119,7 +131,6 @@ def main(logger=None, filename='test.bin', save_filename=""):
             iter_data['price'] = packet.price
             iter_data['quantity'] = packet.quantity
             iter_data['timestamp'] = packet.timestamp
-
         else:
             # print (header.msg_type)
             pass
@@ -128,7 +139,15 @@ def main(logger=None, filename='test.bin', save_filename=""):
         bin_data = bin_data[header.msg_len:]
         arr.append(iter_data)
 
-        if counter % 500 == 0 and bin_data and logger:
+        if len(bin_data) <= 100 and len(file_data) > 0:
+            if len(file_data) < BIN_BUFFER_SIZE:
+                bin_data = bin_data + file_data[:]
+                file_data = []
+            else:
+                bin_data = bin_data + file_data[:BIN_BUFFER_SIZE]
+                file_data = file_data[BIN_BUFFER_SIZE:]
+
+        if counter % 10000 == 0 and bin_data:
             print ("File: {}, count: {}".format(filename, counter))
 
     json.dump({

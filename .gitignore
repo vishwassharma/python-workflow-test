@@ -4,7 +4,6 @@
 *.pyc
 others
 airflow/logs
-airflow/logs
 auth.ansible.json
 *airflow-webserver.pid
 airflow/.worker_env

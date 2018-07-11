@@ -134,8 +134,8 @@ def worker_task(instance_no, total_instances, bin_data_source_blob):
 
         # uploading the file
         upload_name = save_filename.replace(os.path.expanduser('~/'), '')
-        upload_blob(source_file_path=save_filename,
-                    destination_blob_name=upload_name, bucket_name=BUCKET_NAME)
+        upload_blob(source_file_path=save_filename, destination_blob_name=upload_name,
+                    bucket_name=BUCKET_NAME, delete=True)
         upload_names.append(upload_name)
 
     print ("file_names: {}".format(file_names))

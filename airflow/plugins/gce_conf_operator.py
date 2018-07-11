@@ -132,8 +132,9 @@ class UnzipOperator(BaseOperator):
             unzip_root = unzip(path)
             os.remove(path)  # remove the file
             walktree_to_upload(tree_root=unzip_root,
-                               root_blob=bin_root_blob)  # TODO: Make this upload faster using parallel uploads
+                               root_blob=bin_root_blob, delete=True)  # TODO: Make this upload faster using parallel uploads
             unzip_roots.append(unzip_root)
+
         xcom_push(context, {'status': True})
         log.info("unzipping complete")
 

@@ -153,7 +153,8 @@ def create_instance(compute, project, zone, name, bucket, export_configs):
     source_disk_image = image_response['selfLink']
 
     # Configure the machine
-    machine_type = "zones/%s/machineTypes/n1-standard-1" % zone
+    # machine_type = "zones/%s/machineTypes/n1-standard-1" % zone
+    machine_type = "zones/%s/machineTypes/custom-1-1280" % zone
 
     startup_script = open(os.path.join(os.path.dirname(__file__), 'gce_conf_script.sh'), 'r').read()
     become_superuser = "#!/usr/bin/env bash\n" + "sudo su\n"  # this is done here  because after changing the user, all the environment variables are gone
@@ -181,6 +182,7 @@ def create_instance(compute, project, zone, name, bucket, export_configs):
                 'autoDelete': True,
                 'initializeParams': {
                     'sourceImage': source_disk_image,
+                    'diskSizeGb': 20,
                 }
             }
         ],
@@ -261,8 +263,19 @@ def make_dirs(path):
 
 
 def upload_blob(source_file_path, destination_blob_name=None, bucket_name=BUCKET_NAME,
-                tree_root=None, root_blob=None, *args, **kwargs):
-    """Uploads a file to the bucket"""
+                tree_root=None, root_blob=None, delete=False, *args, **kwargs):
+    """
+    Uploads a file to the bucket
+    :param source_file_path:
+    :param destination_blob_name:
+    :param bucket_name:
+    :param tree_root:
+    :param root_blob:
+    :param delete: If True, the file will be deleted after upload
+    :param args:
+    :param kwargs:
+    :return:
+    """
     storage_client = storage.Client()
     bucket = storage_client.get_bucket(bucket_name)
     if destination_blob_name is None:
@@ -276,6 +289,8 @@ def upload_blob(source_file_path, destination_blob_name=None, bucket_name=BUCKET
 
     blob = bucket.blob(destination_blob_name)
     blob.upload_from_filename(source_file_path)
+    if delete:
+        os.remove(source_file_path)
 
 
 def download_blob_by_name(source_blob_name, bucket_name, save_file_root=""):
@@ -346,108 +361,109 @@ def assign_files(instance_no, total_instances, bin_data_source_blob):
         if blob.name.startswith(bin_data_source_blob):
             req_blob.append(blob)
 
-    q = len(req_blob) // total_instances
-    r = len(req_blob) % total_instances
-
-    start = instance_no * q + (instance_no if r - instance_no > 0 else r)
-    end = start + q + (1 if r - instance_no > 0 else 0)
-    """
-    To test the validity for file distribution algorithm
-    # instances = 11
-    # files = 60
-    q = 5
-    r = 5
-    for instance_no in range(11):
-        start = instance_no * q + (instance_no if r - instance_no > 0 else r)
-        end = start + q + (1 if r - instance_no > 0 else 0)
-        print("start: {}, end: {}, total files: {}". format(start, end, end-start))
-    """
-    return [blob for blob in req_blob[start:end]]
-
-
-def sync_folders(blob_name=DESTINATION_BLOB_NAME):
-    """
-    To sync the folders with the cloud storage for the instances to pull
-    """
-    # sleep()
-    storage_client = storage.Client()
-    bucket = storage_client.get_bucket(os.environ.get("BUCKET_NAME", ""))
-    blob_list = bucket.list_blobs()
-    for blob in blob_list:
-        if blob.name.__contains__(blob_name):
-            bucket.delete_blob(blob.name)
-    walktree_to_upload()
+    # q = len(req_blob) // total_instances
+    # r = len(req_blob) % total_instances
+    #
+    # start = instance_no * q + (instance_no if r - instance_no > 0 else r)
+    # end = start + q + (1 if r - instance_no > 0 else 0)
+    # """
+    # To test the validity for file distribution algorithm
+    # # instances = 11
+    # # files = 60
+    # q = 5
+    # r = 5
+    # for instance_no in range(11):
+    #     start = instance_no * q + (instance_no if r - instance_no > 0 else r)
+    #     end = start + q + (1 if r - instance_no > 0 else 0)
+    #     print("start: {}, end: {}, total files: {}". format(start, end, end-start))
+    # """
+    # return [blob for blob in req_blob[start:end]]
+    return [req_blob[blob_no] for blob_no in range(instance_no, len(req_blob), total_instances)]
 
 
-def setup_instances(instances):
-    """
-    will create instances, has to run on local/permanent machine
-    """
-    if not isinstance(instances, list):
-        instances = [instances]
-    project = os.environ.get("PROJECT_NAME", "")
-    bucket = os.environ.get("BUCKET_NAME", "")
-    zone = os.environ.get("ZONE", "")
-    compute = discovery.build('compute', 'v1')
-    for instance in instances:
-        print('Creating instance.')
-        operation = create_instance(compute, project, zone, instance, bucket)
-        wait_for_operation(compute, project, zone, operation['name'])
-        print("instance {} created".format(instance))
-
-
-def worker_task(instance_no, total_instances, bin_data_source_blob, logger=None):
-    """
-    get the task for the worker
-    arguments contains the various parameters that will
-    be used by the machines to process the data like file numbers
-    instance_no belongs to [0, total_instances - 1]
-    """
-    if logger:
-        log_info = logger.info
-    else:
-        log_info = print_alias
-
-    BIN_DATA_STORAGE = os.path.expanduser('~/raw_data')
-    PROCESSED_DATA_BLOB_NAME = "processed/" + bin_data_source_blob
-    PROCESSED_DATA_STORAGE = os.path.expanduser('~/' + PROCESSED_DATA_BLOB_NAME)
-
-    assigned_blobs = assign_files(instance_no=instance_no,
-                                  total_instances=total_instances,
-                                  bin_data_source_blob=bin_data_source_blob)
-    log_info("Instance_no: {}".format(instance_no))
-    log_info('Blobs assigned: ' + str(assigned_blobs))
-
-    # downloading the files
-    file_names = []
-    for blob in assigned_blobs:  # downloading bin files
-        rel_file_name = blob.name.replace(bin_data_source_blob + '/', '')
-        filename = os.path.join(BIN_DATA_STORAGE, rel_file_name)
-        make_dirs(os.path.dirname(filename))
-        blob.download_to_filename(filename)
-        log_info('File {} downloaded to {}'.format(str(blob.name), filename))
-        file_names.append(filename)
-
-    save_names = []
-    upload_names = []
-    for filename in file_names:
-        # processing the file
-        save_filename = filename.replace(BIN_DATA_STORAGE, PROCESSED_DATA_STORAGE).replace('.bin', '.json')
-        make_dirs(os.path.dirname(save_filename))
-        log_parser.main(logger, filename=filename, save_filename=save_filename)
-        save_names.append(save_filename)
-
-        # uploading the file
-        upload_name = save_filename.replace(os.path.expanduser('~/'), '')
-        upload_blob(source_file_name=save_filename,
-                    destination_blob_name=upload_name)
-        upload_names.append(upload_name)
-
-        # print ("file_names: {}".format(file_names))
-        # print ("save_names: {}".format(save_names))
-        # print ("upload_names: {}".format(upload_names))
-
-
+# def sync_folders(blob_name=DESTINATION_BLOB_NAME):
+#     """
+#     To sync the folders with the cloud storage for the instances to pull
+#     """
+#     # sleep()
+#     storage_client = storage.Client()
+#     bucket = storage_client.get_bucket(os.environ.get("BUCKET_NAME", ""))
+#     blob_list = bucket.list_blobs()
+#     for blob in blob_list:
+#         if blob.name.__contains__(blob_name):
+#             bucket.delete_blob(blob.name)
+#     walktree_to_upload()
+#
+#
+# def setup_instances(instances):
+#     """
+#     will create instances, has to run on local/permanent machine
+#     """
+#     if not isinstance(instances, list):
+#         instances = [instances]
+#     project = os.environ.get("PROJECT_NAME", "")
+#     bucket = os.environ.get("BUCKET_NAME", "")
+#     zone = os.environ.get("ZONE", "")
+#     compute = discovery.build('compute', 'v1')
+#     for instance in instances:
+#         print('Creating instance.')
+#         operation = create_instance(compute, project, zone, instance, bucket)
+#         wait_for_operation(compute, project, zone, operation['name'])
+#         print("instance {} created".format(instance))
+#
+#
+# def worker_task(instance_no, total_instances, bin_data_source_blob, logger=None):
+#     """
+#     get the task for the worker
+#     arguments contains the various parameters that will
+#     be used by the machines to process the data like file numbers
+#     instance_no belongs to [0, total_instances - 1]
+#     """
+#     if logger:
+#         log_info = logger.info
+#     else:
+#         log_info = print_alias
+#
+#     BIN_DATA_STORAGE = os.path.expanduser('~/raw_data')
+#     PROCESSED_DATA_BLOB_NAME = "processed/" + bin_data_source_blob
+#     PROCESSED_DATA_STORAGE = os.path.expanduser('~/' + PROCESSED_DATA_BLOB_NAME)
+#
+#     assigned_blobs = assign_files(instance_no=instance_no,
+#                                   total_instances=total_instances,
+#                                   bin_data_source_blob=bin_data_source_blob)
+#     log_info("Instance_no: {}".format(instance_no))
+#     log_info('Blobs assigned: ' + str(assigned_blobs))
+#
+#     # downloading the files
+#     file_names = []
+#     for blob in assigned_blobs:  # downloading bin files
+#         rel_file_name = blob.name.replace(bin_data_source_blob + '/', '')
+#         filename = os.path.join(BIN_DATA_STORAGE, rel_file_name)
+#         make_dirs(os.path.dirname(filename))
+#         blob.download_to_filename(filename)
+#         log_info('File {} downloaded to {}'.format(str(blob.name), filename))
+#         file_names.append(filename)
+#
+#     save_names = []
+#     upload_names = []
+#     for filename in file_names:
+#         # processing the file
+#         save_filename = filename.replace(BIN_DATA_STORAGE, PROCESSED_DATA_STORAGE).replace('.bin', '.json')
+#         make_dirs(os.path.dirname(save_filename))
+#         log_parser.main(logger, filename=filename, save_filename=save_filename)
+#         save_names.append(save_filename)
+#
+#         # uploading the file
+#         upload_name = save_filename.replace(os.path.expanduser('~/'), '')
+#         upload_blob(source_file_name=save_filename,
+#                     destination_blob_name=upload_name)
+#         upload_names.append(upload_name)
+#
+#         # print ("file_names: {}".format(file_names))
+#         # print ("save_names: {}".format(save_names))
+#         # print ("upload_names: {}".format(upload_names))
+#
+#
 def delete_instances(instances):
     """
     has to run on the local/permanent machine to destroy the instances after completion of work.
@@ -460,7 +476,7 @@ def delete_instances(instances):
         operation = delete_instance(compute, project, zone, instance)
         wait_for_operation(compute, project, zone, operation['name'])
         print("instance {} deleted...".format(instance))
-
+#
 # if __name__ == "__main__":
 #     # def pr(*args):
 #     #     print (args)
@@ -471,7 +487,10 @@ def delete_instances(instances):
 #     # walktree_to_upload("/home/rtheta/parser_pipeline/airflow", pr)
 #     # sync_folders()
 #
-#     worker_task(0, 3)
-#     worker_task(1, 3)
-#     worker_task(2, 3)
+#     # worker_task(0, 3)
+#     # worker_task(1, 3)
+#     # worker_task(2, 3)
 #     # pass
+#     print assign_files(0, 3, 'bin_log')
+#     print assign_files(1, 3, 'bin_log')
+#     print assign_files(2, 3, 'bin_log')
