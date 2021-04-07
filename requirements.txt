@@ -1,7 +1,7 @@
 airflow==1.8.0
 alembic==0.8.10
 amqp==2.2.2
-ansible==2.5.3
+ansible==2.10.0
 apache-libcloud==2.3.0
 asn1crypto==0.24.0
 Babel==2.5.3
